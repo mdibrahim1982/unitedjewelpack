@@ -10,7 +10,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 // name is attached to the orders they place on WhatsApp, but they don't
 // get access to the Admin Dashboard.
 const SALES_REPS = [
-  { email: "rep1@unitedjewelpack.com", password: "Rep123$", name: "Sales Rep 1" },
+  { email: "rep1@unitedjewelpack.com", password: "Riyas123$", name: "Riyas" },
   { email: "rep2@unitedjewelpack.com", password: "Rep123$", name: "Sales Rep 2" },
 ];
 
