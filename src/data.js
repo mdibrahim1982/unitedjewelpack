@@ -23,7 +23,7 @@ export const FOLDERS = [
     id: "ring-boxes",
     slug: "ring-boxes",
     name: "Ring Boxes",
-    cover: "/unitedjewelpack/assets/folders/ring-boxes/crystal-round.jpg",
+    cover: "${import.meta.env.BASE_URL}assets/folders/ring-boxes/crystal-round.jpg",
     photos: [
       { id: 1, img: "/unitedjewelpack/assets/folders/ring-boxes/crystal-round.jpg", caption: "Crystal Round Box" },
       { id: 2, img: "${import.meta.env.BASE_URL}/assets/folders/ring-boxes/magenta-diamond.jpg", caption: "Magenta Diamond Box" },
