@@ -25,7 +25,7 @@ export const FOLDERS = [
     name: "Ring Boxes",
     cover: "/unitedjewelpack/assets/folders/ring-boxes/crystal-round.jpg",
     photos: [
-      { id: 1, img: "/${import.meta.env.BASE_URL}assets/folders/ring-boxes/crystal-round.jpg", caption: "Crystal Round Box" },
+      { id: 1, img: "/unitedjewelpack/assets/folders/ring-boxes/crystal-round.jpg", caption: "Crystal Round Box" },
       { id: 2, img: "${import.meta.env.BASE_URL}/assets/folders/ring-boxes/magenta-diamond.jpg", caption: "Magenta Diamond Box" },
       { id: 3, img: "${import.meta.env.BASE_URL}/assets/folders/ring-boxes/emerald-diamond.jpg", caption: "Emerald Diamond Box" },
       { id: 4, img: "${import.meta.env.BASE_URL}/assets/folders/ring-boxes/cream-round.jpg", caption: "Cream Round Box" },
