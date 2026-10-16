@@ -1,9 +1,23 @@
 import { useState } from "react";
 import { useAuth } from "../auth";
+import { useSalesRepAuth } from "../salesRepAuth";
+import { useCustomer } from "../customerStore";
+import { useCart } from "../cartStore";
+import SessionBlocked from "./SessionBlocked";
 import { useLanguage } from "../i18n";
 
 export default function AdminLogin({ onSuccess }) {
   const { login } = useAuth();
+  const rep = useSalesRepAuth();
+  const { customer, logout: customerLogout } = useCustomer();
+  const { clearCartOnLogout } = useCart();
+
+  // Someone else is still signed in → they have to log out first.
+  const blocker = rep.isSalesRep
+    ? { role: "salesRep", name: rep.salesRepName, logout: rep.logout }
+    : customer
+    ? { role: "customer", name: customer.shopName, logout: customerLogout }
+    : null;
   const { t } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -13,12 +27,28 @@ export default function AdminLogin({ onSuccess }) {
   function handleSubmit(e) {
     e.preventDefault();
     const ok = login(email, password);
-    if (ok) {
+    if (ok === "blocked") {
+      // Someone signed in from another tab after this form appeared. Reload
+      // so the screen reflects it (and shows the "log out first" panel)
+      // rather than claiming the password was wrong.
+      window.location.reload();
+      return;
+    }
+    if (ok === true) {
       setError(false);
       onSuccess();
     } else {
       setError(true);
     }
+  }
+
+  if (blocker) {
+    return (
+      <SessionBlocked blocker={blocker} requested="admin" onLogout={() => {
+          clearCartOnLogout();
+          blocker.logout();
+        }} />
+    );
   }
 
   return (
