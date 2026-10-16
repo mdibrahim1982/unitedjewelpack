@@ -6,6 +6,7 @@ import { useSalesRepAuth } from "../salesRepAuth";
 import { useAuth } from "../auth";
 import { useCustomer } from "../customerStore";
 import { validateDetails } from "../customerDetails";
+import { roundTotal } from "../money";
 import { useOrders } from "../ordersStore";
 import { usePricing, formatMoney, parseStock, PCS_PER_UNIT } from "../pricingStore";
 import { whatsappCartOrderLink, orderRefOf } from "../cartShare";
@@ -69,11 +70,18 @@ export default function CartModal({ onClose }) {
     if (fieldErrors[name]) setFieldErrors((prev) => ({ ...prev, [name]: undefined }));
   }
 
-  const extraAmount = noExtraCharge
-    ? 0
-    : Math.max(0, Number(extraAmountInput) || 0);
+  // Miscellaneous charges exist only for staff; a customer never sees or
+  // pays them.
+  const extraAmount =
+    !isStaff || noExtraCharge ? 0 : Math.max(0, Number(extraAmountInput) || 0);
 
-  const totalValue = itemsTotal + extraAmount;
+  // The cart total is rounded to the nearest rupee; the difference is shown
+  // on its own "Round off" line so the figures always add up.
+  const {
+    amount: exactTotal,
+    rounded: totalValue,
+    roundOff,
+  } = roundTotal(itemsTotal + extraAmount);
 
   // Sum of every item's own qty × its own pcsPerUnit — accurate even when
   // the cart mixes standard GR items with low-stock PCS items.
@@ -120,6 +128,7 @@ export default function CartModal({ onClose }) {
       items,
       extraAmount,
       itemsTotal,
+      roundOff,
       totalValue,
       ...details,
     });
@@ -141,7 +150,12 @@ export default function CartModal({ onClose }) {
     clearCart();
     setFields({ shopName: "", location: "", mobile: "" });
     setFieldErrors({});
-    setNotice({ type: "ok", text: t("orderSubmittedForApproval") });
+    setNotice({
+      type: "success",
+      ref: orderRefOf(result.id),
+      name: details.shopName,
+      staff: isStaff,
+    });
   }
 
   // Credits an item's debited stock back (used when it's removed from the
@@ -190,7 +204,28 @@ export default function CartModal({ onClose }) {
           </button>
         </div>
 
-        {notice && (
+        {notice && notice.type === "success" && (
+          <div className="order-success" role="status">
+            <div className="order-success-icon" aria-hidden="true">✅</div>
+            <h3 className="order-success-title">{t("orderSuccessTitle")}</h3>
+            {notice.staff ? (
+              <p className="order-success-body">
+                {t("orderSuccessStaffBody", { name: notice.name })}
+              </p>
+            ) : (
+              <>
+                <p className="order-success-thanks">
+                  {t("orderSuccessThanks", { name: notice.name })}
+                </p>
+                <p className="order-success-body">{t("orderSuccessBody")}</p>
+              </>
+            )}
+            <p className="order-success-ref">
+              {t("orderSuccessRef", { ref: notice.ref })}
+            </p>
+          </div>
+        )}
+        {notice && notice.type !== "success" && (
           <p
             className={
               "cart-notice" + (notice.type === "error" ? " cart-notice-error" : "")
@@ -201,7 +236,9 @@ export default function CartModal({ onClose }) {
           </p>
         )}
         {items.length === 0 ? (
-          <p className="empty-note cart-empty">{t("emptyCart")}</p>
+          notice?.type === "success" ? null : (
+            <p className="empty-note cart-empty">{t("emptyCart")}</p>
+          )
         ) : (
           <>
             <ul className="cart-item-list">
@@ -298,6 +335,7 @@ export default function CartModal({ onClose }) {
                 </div>
               )}
 
+              {isStaff && (
               <div className="cart-extra-charge">
                 <label className="cart-extra-checkbox-row">
                   <input
@@ -324,7 +362,23 @@ export default function CartModal({ onClose }) {
                   />
                 </div>
               </div>
+              )}
 
+              {roundOff !== 0 && (
+                <div className="cart-roundoff">
+                  <div className="cart-roundoff-row">
+                    <span>{t("amountLabel")}</span>
+                    <span>{formatMoney(exactTotal)}</span>
+                  </div>
+                  <div className="cart-roundoff-row">
+                    <span>{t("roundOffLabel")}</span>
+                    <span>
+                      {roundOff > 0 ? "+" : "−"}
+                      {formatMoney(Math.abs(roundOff))}
+                    </span>
+                  </div>
+                </div>
+              )}
               <div className="cart-total-row">
                 <span>{t("totalValueLabel")}</span>
                 <strong>{formatMoney(totalValue)}</strong>
