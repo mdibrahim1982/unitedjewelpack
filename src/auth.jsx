@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { SESSION_KEYS, currentBlocker } from "./activeSession";
 
 // ===================== admin credentials =====================
 // Hardcoded for this front-end-only demo. There is no backend, so this
@@ -9,7 +10,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 const ADMIN_EMAIL = "unitedjewelpack@gmail.com";
 const ADMIN_PASSWORD = "Ujp123$";
 
-const SESSION_KEY = "ujp_admin_session";
+const SESSION_KEY = SESSION_KEYS.admin;
 
 const AuthContext = createContext(null);
 
@@ -34,7 +35,10 @@ export function AuthProvider({ children }) {
     }
   }, [isAdmin]);
 
+  // Returns true (signed in), false (wrong credentials) or "blocked" when
+  // someone else is still signed in — they must log out first.
   function login(email, password) {
+    if (currentBlocker("admin")) return "blocked";
     const ok =
       email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase() &&
       password === ADMIN_PASSWORD;
