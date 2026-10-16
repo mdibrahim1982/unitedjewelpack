@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "node tests/inventoryLedger.test.mjs && node tests/mockData.test.mjs && node tests/customerDetails.test.mjs",
+    "test": "node tests/inventoryLedger.test.mjs && node tests/mockData.test.mjs && node tests/customerDetails.test.mjs && node tests/activeSession.test.mjs && node tests/money.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
