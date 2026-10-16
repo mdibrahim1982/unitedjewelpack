@@ -1,4 +1,5 @@
 import { waLink } from "./data";
+import { roundTotal } from "./money";
 import { PCS_PER_UNIT } from "./pricingStore";
 
 // ===================== cart → WhatsApp order =====================
@@ -36,7 +37,8 @@ export function buildCartOrderMessage(
   const totalPieces = items.reduce((sum, it) => sum + piecesOf(it), 0);
   const itemsTotal = items.reduce((sum, it) => sum + lineTotal(it), 0);
   const safeExtra = Number(extraAmount) > 0 ? Number(extraAmount) : 0;
-  const totalValue = itemsTotal + safeExtra;
+  // Same rounding the cart shows: nearest rupee, difference on its own line.
+  const { amount, rounded: totalValue, roundOff } = roundTotal(itemsTotal + safeExtra);
   const shopName = (shopDetails.shopName || "").trim();
   const location = (shopDetails.location || "").trim();
   const mobile = (shopDetails.mobile || "").trim();
@@ -60,6 +62,9 @@ export function buildCartOrderMessage(
           : ` — ₹${unitOf(it)}/pc — ₹${lineTotal(it)}`)
     ),
     ...(safeExtra > 0 ? ["", `Extra charge: ₹${safeExtra}`] : []),
+    ...(roundOff !== 0
+      ? ["", `Amount: ₹${amount}`, `Round off: ${roundOff > 0 ? "+" : "-"}₹${Math.abs(roundOff)}`]
+      : []),
     "",
     `Total: ${items.length} item${
       items.length === 1 ? "" : "s"
