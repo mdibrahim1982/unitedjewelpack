@@ -3,6 +3,7 @@ import { useLanguage } from "../i18n";
 import { useAuth } from "../auth";
 import { useSalesRepAuth } from "../salesRepAuth";
 import { useCustomer } from "../customerStore";
+import { useCart } from "../cartStore";
 import LanguageSwitch from "./LanguageSwitch";
 
 // Full-width banner: brand + tagline on the left, actions on the right, and
@@ -14,6 +15,7 @@ export default function Header({ onLogoClick, onAdminClick, onSalesRepClick }) {
   const { isAdmin, logout: adminLogout } = useAuth();
   const { isSalesRep, salesRepName, logout: salesRepLogout } = useSalesRepAuth();
   const { customer, logout: customerLogout } = useCustomer();
+  const { clearCartOnLogout } = useCart();
 
   // Staff take precedence; a customer who is also remembered stays signed in
   // after staff log out.
@@ -21,15 +23,21 @@ export default function Header({ onLogoClick, onAdminClick, onSalesRepClick }) {
   const signedIn = isStaff || !!customer;
 
   function handleLogout() {
+    clearCartOnLogout();
     if (isSalesRep) salesRepLogout();
     if (isAdmin) adminLogout();
     if (!isStaff) customerLogout();
   }
 
-  let who = null;
-  if (isAdmin) who = `🛡️ ${t("adminDashboard")}`;
-  else if (isSalesRep) who = `🤝 ${salesRepName}`;
-  else if (customer) who = `🏪 ${customer.shopName} · ${customer.location}`;
+  // Only one user can be signed in at a time: while someone is, the other
+  // roles' buttons are locked until that person logs out.
+  const adminLocked = !isAdmin && (isSalesRep || !!customer);
+  const salesRepLocked = !isSalesRep && (isAdmin || !!customer);
+
+  let userName = null;
+  if (isAdmin) userName = t("role_admin");
+  else if (isSalesRep) userName = salesRepName;
+  else if (customer) userName = customer.shopName;
 
   return (
     <header className="site banner">
@@ -59,10 +67,20 @@ export default function Header({ onLogoClick, onAdminClick, onSalesRepClick }) {
           >
             {t("whatsappUs")}
           </a>
-          <button className="banner-btn" onClick={onSalesRepClick}>
+          <button
+            className="banner-btn"
+            onClick={onSalesRepClick}
+            disabled={salesRepLocked}
+            title={salesRepLocked ? t("sessionLockedHint") : undefined}
+          >
             {isSalesRep ? t("salesRepDashboardTitle") : t("salesRepLink")}
           </button>
-          <button className="banner-btn" onClick={onAdminClick}>
+          <button
+            className="banner-btn"
+            onClick={onAdminClick}
+            disabled={adminLocked}
+            title={adminLocked ? t("sessionLockedHint") : undefined}
+          >
             {isAdmin ? t("adminDashboard") : t("adminLink")}
           </button>
         </div>
@@ -70,7 +88,12 @@ export default function Header({ onLogoClick, onAdminClick, onSalesRepClick }) {
 
       {signedIn && (
         <div className="banner-who">
-          <span className="banner-who-text">{who}</span>
+          <span
+            className="banner-who-text"
+            title={customer && !isStaff ? `${customer.shopName} · ${customer.location}` : undefined}
+          >
+            👋 {t("welcomeUser", { name: userName })}
+          </span>
           <button
             className="banner-btn banner-btn-logout header-logout-btn"
             onClick={handleLogout}
