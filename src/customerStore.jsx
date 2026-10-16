@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { validateDetails } from "./customerDetails";
+import { SESSION_KEYS, currentBlocker } from "./activeSession";
 
 // ===================== customer identity =====================
 // A customer is "logged in" simply by having given Shop Name, Location and
@@ -10,7 +11,7 @@ import { validateDetails } from "./customerDetails";
 // Admins and sales reps don't use this: they type the customer's details
 // into the cart for each order instead.
 
-const KEY = "ujp_customer";
+const KEY = SESSION_KEYS.customer;
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // one year
 
 function readCookie() {
@@ -81,6 +82,9 @@ export function CustomerProvider({ children }) {
 
   // `details` must already be validated by the caller (validateDetails).
   function login(details) {
+    // Someone else (admin / sales rep) is still signed in → refuse.
+    const blocker = currentBlocker("customer");
+    if (blocker) return { ok: false, errors: {}, blocked: blocker };
     const checked = validateDetails(details);
     if (!checked.ok) return checked;
     writeSaved(checked.values);
