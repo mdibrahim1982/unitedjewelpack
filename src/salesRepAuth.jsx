@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { SESSION_KEYS, currentBlocker } from "./activeSession";
 
 // ===================== sales rep credentials =====================
 // Hardcoded for this front-end-only demo, same pattern as auth.jsx. There
@@ -10,11 +11,11 @@ import { createContext, useContext, useEffect, useState } from "react";
 // name is attached to the orders they place on WhatsApp, but they don't
 // get access to the Admin Dashboard.
 const SALES_REPS = [
-  { email: "rep1@unitedjewelpack.com", password: "Riyas123$", name: "Riyas" },
+  { email: "rep1@unitedjewelpack.com", password: "Rep123$", name: "Sales Rep 1" },
   { email: "rep2@unitedjewelpack.com", password: "Rep123$", name: "Sales Rep 2" },
 ];
 
-const SESSION_KEY = "ujp_salesrep_session";
+const SESSION_KEY = SESSION_KEYS.salesRep;
 
 const SalesRepAuthContext = createContext(null);
 
@@ -39,7 +40,9 @@ export function SalesRepAuthProvider({ children }) {
     }
   }, [salesRepName]);
 
+  // Returns true / false, or "blocked" when someone else is still signed in.
   function login(email, password) {
+    if (currentBlocker("salesRep")) return "blocked";
     const match = SALES_REPS.find(
       (rep) =>
         rep.email.toLowerCase() === email.trim().toLowerCase() &&
