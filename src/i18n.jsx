@@ -184,6 +184,25 @@ const STRINGS = {
     mockErrActive:
       "Can't load mock data while real orders are pending or approved. Finish or cancel them first.",
     mockErrGeneric: "Couldn't complete that. Nothing was changed.",
+    welcomeUser: "Welcome {name}",
+    orderSuccessTitle: "Your order has been placed successfully!",
+    orderSuccessThanks: "Thank you, {name}.",
+    orderSuccessBody:
+      "We'll dispatch it once we've checked availability. We really appreciate your business.",
+    orderSuccessStaffBody:
+      "The order for {name} was sent to the admin on WhatsApp and is now pending approval.",
+    orderSuccessRef: "Order ref: #{ref}",
+    amountLabel: "Amount",
+    roundOffLabel: "Round off",
+    // one signed-in user at a time
+    role_admin: "Admin",
+    role_salesRep: "Sales Rep",
+    role_customer: "Customer",
+    sessionBlockedTitle: "Someone is already signed in",
+    sessionBlockedText:
+      "{who} is signed in on this device. They need to log out before {requested} can sign in.",
+    sessionBlockedLogout: "Log out {who}",
+    sessionLockedHint: "Log out first to switch user",
     // customer login / required details / banner
     customerLoginTitle: "Welcome",
     customerLoginSubtitle: "Tell us about your shop to browse and place orders.",
@@ -321,6 +340,23 @@ const STRINGS = {
     adminDashboardSubtitle:
       "புகைப்படங்களைச் சேர்க்கவும், மறுபெயரிடவும், அலகு விலையை அமைக்கவும் அல்லது பேக்அப்பிற்கு நகர்த்தவும்.",
     backToSite: "← தளத்திற்குத் திரும்பு",
+
+    // customer login / welcome / order confirmation (Tamil)
+    customerLoginTitle: "வரவேற்கிறோம்",
+    customerLoginSubtitle: "உலாவவும் ஆர்டர் செய்யவும் உங்கள் கடை விவரங்களைத் தெரிவிக்கவும்.",
+    customerLoginContinue: "பட்டியலுக்குச் செல்லவும்",
+    customerLoginNote: "இந்த சாதனத்தில் சேமிக்கப்படும்; மீண்டும் கேட்கப்பட மாட்டாது.",
+    customerLoginStaff: "பணியாளரா?",
+    fieldRequired: "இந்தப் புலம் அவசியம்.",
+    mobileInvalid: "சரியான 10 இலக்க மொபைல் எண்ணை உள்ளிடவும்.",
+    welcomeUser: "வரவேற்கிறோம் {name}",
+    orderSuccessTitle: "உங்கள் ஆர்டர் வெற்றிகரமாகப் பதிவு செய்யப்பட்டது!",
+    orderSuccessThanks: "நன்றி, {name}.",
+    orderSuccessBody:
+      "இருப்பைச் சரிபார்த்த பிறகு உங்கள் ஆர்டர் அனுப்பி வைக்கப்படும். உங்கள் ஆதரவுக்கு மனமார்ந்த நன்றி.",
+    orderSuccessRef: "ஆர்டர் எண்: #{ref}",
+    amountLabel: "தொகை",
+    roundOffLabel: "ரவுண்ட் ஆஃப்",
 
     // sales rep
     salesRepLink: "விற்பனை பிரதிநிதி",
