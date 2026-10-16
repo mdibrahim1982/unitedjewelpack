@@ -103,6 +103,15 @@ test("one dispatched order was sent ABOVE its ordered quantity", () => {
   assert.deepEqual([l.ordered, l.dispatched, l.returned, l.extra], [300, 330, 0, 30]);
 });
 
+test("order totals are whole rupees and add up with the round-off", () => {
+  for (const o of orders) {
+    assert.ok(Number.isInteger(o.totalValue), `${o.id} total ${o.totalValue}`);
+    const exact = o.itemsTotal + o.extraAmount;
+    assert.ok(Math.abs(Math.round((exact + o.roundOff) * 100) / 100 - o.totalValue) < 0.011, o.id);
+    assert.ok(Math.abs(o.roundOff) <= 0.5, o.id);
+  }
+});
+
 test("refuses to build with too few photos", () => {
   assert.equal(buildMockData([{ id: "x", name: "x", photos: [{ id: 1 }] }]).code, "not_enough_photos");
 });
