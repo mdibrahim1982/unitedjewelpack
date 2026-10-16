@@ -178,6 +178,15 @@ export function CartProvider({ children }) {
     setItems([]);
   }
 
+  // When a user logs out, their unplaced items must not be inherited by the
+  // next person to sign in (possibly a different shop). Lines saved by an
+  // OLD version of the app already took stock out of inventory, though, and
+  // would lose it if wiped silently — so in that rare case the cart is kept.
+  function clearCartOnLogout() {
+    const tookStock = items.some((it) => (it.debitedPieces ?? Infinity) > 0);
+    if (!tookStock) setItems([]);
+  }
+
   const totalItems = items.length;
   const totalQty = items.reduce((sum, it) => sum + it.qty, 0);
 
@@ -189,6 +198,7 @@ export function CartProvider({ children }) {
         updateQty,
         removeFromCart,
         clearCart,
+        clearCartOnLogout,
         totalItems,
         totalQty,
       }}
