@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useLanguage } from "../i18n";
 import { useCustomer } from "../customerStore";
-import { validateDetails } from "../customerDetails";
 
 // The default landing page for anyone who isn't signed in as staff. No
 // password — it just records who is ordering, saves it on this device, and
@@ -11,6 +10,7 @@ export default function CustomerLogin({ onSalesRep, onAdmin }) {
   const { login } = useCustomer();
   const [fields, setFields] = useState({ shopName: "", location: "", mobile: "" });
   const [errors, setErrors] = useState({});
+  const [blocked, setBlocked] = useState(null);
 
   function setField(name, value) {
     setFields((prev) => ({ ...prev, [name]: value }));
@@ -20,6 +20,7 @@ export default function CustomerLogin({ onSalesRep, onAdmin }) {
   function handleSubmit(e) {
     e.preventDefault();
     const result = login(fields);
+    setBlocked(result.blocked || null);
     if (!result.ok) setErrors(result.errors);
   }
 
@@ -37,6 +38,15 @@ export default function CustomerLogin({ onSalesRep, onAdmin }) {
           {t("customerLoginTitle")}
         </h1>
         <p className="page-sub">{t("customerLoginSubtitle")}</p>
+
+        {blocked && (
+          <p className="cart-notice cart-notice-error" role="alert">
+            {t("sessionBlockedText", {
+              who: `${t(`role_${blocked.role}`)} — ${blocked.name}`,
+              requested: t("role_customer"),
+            })}
+          </p>
+        )}
 
         {rows.map(([name, label, placeholder, type, autoComplete]) => (
           <div className="customer-login-field" key={name}>
