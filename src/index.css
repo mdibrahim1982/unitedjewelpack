@@ -309,7 +309,6 @@ header.site{
 }
 .price-label{
   padding:0 12px 4px; font-size:12.5px; color:var(--terracotta-d); font-weight:600;
-  font-family: Arial, "Noto Sans", sans-serif;
 }
 .stock-label{
   padding:0 12px 12px; font-size:12px; color:var(--ink-soft); font-weight:500;
@@ -1271,3 +1270,33 @@ header.site.banner::after{ display:none; }
 .dispatch-delta-more{ background:#E1F0FF; color:#175A9C; }
 .dispatch-delta-same{ background:var(--cream-deep); color:var(--ink-soft); }
 .order-placed-by{ display:inline-block; margin-left:6px; padding:1px 8px; border-radius:999px; font-size:11px; font-weight:600; background:var(--cream-deep); color:var(--ink-soft); }
+
+/* ---------- Round-off, success card, locked buttons ---------- */
+.cart-roundoff{ margin:0 0 6px; padding:0 12px; }
+.cart-roundoff-row{
+  display:flex; justify-content:space-between; font-size:13px;
+  color:var(--ink-soft); padding:2px 0;
+}
+.order-success{
+  text-align:center; padding:22px 18px; margin:4px 0 14px;
+  background:linear-gradient(180deg, #F1FAF3 0%, #E3F4E8 100%);
+  border:1px solid #BFE3C8; border-radius:16px;
+}
+.order-success-icon{ font-size:38px; line-height:1; margin-bottom:8px; }
+.order-success-title{
+  font-size:18px; line-height:1.3; color:#1F6B37; margin:0 0 8px;
+  font-family:'Fredoka','Fraunces',serif; font-weight:600;
+}
+.order-success-thanks{ margin:0 0 6px; font-size:15px; font-weight:600; color:var(--ink); }
+.order-success-body{ margin:0 0 10px; font-size:13.5px; line-height:1.5; color:var(--ink-soft); }
+.order-success-ref{
+  display:inline-block; margin:0; padding:3px 12px; border-radius:999px;
+  background:#fff; border:1px solid #BFE3C8; color:#1F6B37;
+  font-size:12px; font-weight:600; letter-spacing:.4px;
+}
+.banner-btn:disabled, .banner-btn:disabled:hover{
+  opacity:.45; cursor:not-allowed; transform:none; box-shadow:none;
+  background:rgba(255,255,255,.10);
+}
+.session-blocked-card{ text-align:center; }
+.session-blocked-icon{ font-size:34px; margin-bottom:6px; }
