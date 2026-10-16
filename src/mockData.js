@@ -24,6 +24,7 @@ import {
   confirmDispatch,
   checkInvariants,
 } from "./inventoryLedger.js";
+import { roundTotal } from "./money.js";
 
 export const MOCK_SEED = 20240611;
 const PCS_PER_UNIT = 150;
@@ -166,6 +167,7 @@ export function buildMockData(folders, now = new Date()) {
     });
     const itemsTotal = lines.reduce((sum, l) => sum + l.pieces * (prices[l.key] || 0), 0);
     const extraAmount = s.extra || 0;
+    const { rounded, roundOff } = roundTotal(itemsTotal + extraAmount);
     const [shopName, location, mobile] = SHOPS[s.shop];
     const created = at(s.daysAgo);
 
@@ -185,7 +187,8 @@ export function buildMockData(folders, now = new Date()) {
           placedBy: s.rep === null ? "customer" : "salesRep",
           extraAmount,
           itemsTotal,
-          totalValue: itemsTotal + extraAmount,
+          roundOff,
+          totalValue: rounded,
         },
         created
       ),
