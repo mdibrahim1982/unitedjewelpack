@@ -13,7 +13,7 @@ export const GENERIC_MSG =
 // its photos in a grid.
 //
 // To add a new folder:
-//   1. drop photos into public/unitedjewelpack/assets/folders/<your-folder-slug>/
+//   1. drop photos into public/assets/folders/<your-folder-slug>/
 //   2. add an entry here with a unique id, slug, name, and a photos array
 //
 // To add more photos to an existing folder, just add more entries to its
@@ -23,15 +23,15 @@ export const FOLDERS = [
     id: "ring-boxes",
     slug: "ring-boxes",
     name: "Ring Boxes",
-    cover: "/unitedjewelpack/assets/folders/ring-boxes/crystal-round.jpg",
+    cover: "/assets/folders/ring-boxes/crystal-round.jpg",
     photos: [
-      { id: 1, img: "/unitedjewelpack/assets/folders/ring-boxes/crystal-round.jpg", caption: "Crystal Round Box" },
-      { id: 2, img: "/unitedjewelpack/assets/folders/ring-boxes/magenta-diamond.jpg", caption: "Magenta Diamond Box" },
-      { id: 3, img: "/unitedjewelpack/assets/folders/ring-boxes/emerald-diamond.jpg", caption: "Emerald Diamond Box" },
-      { id: 4, img: "/unitedjewelpack/assets/folders/ring-boxes/cream-round.jpg", caption: "Cream Round Box" },
-      { id: 5, img: "/unitedjewelpack/assets/folders/ring-boxes/arya-ringbeet.jpeg", caption: "Arya Ring(Beet)" },
-      { id: 6, img: "/unitedjewelpack/assets/folders/ring-boxes/arya-ringcherry.jpeg", caption: "Arya Ring(Cherry)" },
-      { id: 7, img: "/unitedjewelpack/assets/folders/ring-boxes/arya-rings.w.jpeg", caption: "Arya Ring(S.W)" },
+      { id: 1, img: "/assets/folders/ring-boxes/crystal-round.jpg", caption: "Crystal Round Box" },
+      { id: 2, img: "/assets/folders/ring-boxes/magenta-diamond.jpg", caption: "Magenta Diamond Box" },
+      { id: 3, img: "/assets/folders/ring-boxes/emerald-diamond.jpg", caption: "Emerald Diamond Box" },
+      { id: 4, img: "/assets/folders/ring-boxes/cream-round.jpg", caption: "Cream Round Box" },
+      { id: 5, img: "/assets/folders/ring-boxes/arya-ringbeet.jpeg", caption: "Arya Ring(Beet)" },
+      { id: 6, img: "/assets/folders/ring-boxes/arya-ringcherry.jpeg", caption: "Arya Ring(Cherry)" },
+      { id: 7, img: "/assets/folders/ring-boxes/arya-rings.w.jpeg", caption: "Arya Ring(S.W)" },
       { id: 8, img: "/unitedjewelpack/assets/folders/ring-boxes/arya-ring.jpeg", caption: "Arya Ring" },
       { id: 9, img: "/unitedjewelpack/assets/folders/ring-boxes/baby-open-type-cream.jpeg", caption: "Baby Open Type (Cream)" },
       { id: 10, img: "/unitedjewelpack/assets/folders/ring-boxes/casino-ringcream-2.jpeg", caption: "Casino Ring(Cream)" },
