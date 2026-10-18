@@ -50,7 +50,7 @@ export default function Header({ onLogoClick, onAdminClick, onSalesRepClick }) {
           <span className="banner-mono">UJP</span>
           <span className="banner-text">
             <span className="banner-title">{t("brandName")}</span>
-            <span className="banner-subtitle">Quality Jewellery Compliments · Trusted Service</span>
+            <span className="banner-subtitle">{t("brandPlace")}</span>
           </span>
         </button>
 
