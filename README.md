@@ -198,3 +198,5 @@ Either:
 - Test on a real phone/tablet where possible — simulators are a good first
   pass, but the native share sheet and safe-area insets are easiest to
   confirm on an actual Android or iOS device.
+
+Updated directly in GitHub Codespaces browser.
