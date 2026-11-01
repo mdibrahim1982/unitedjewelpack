@@ -1,4 +1,4 @@
-import { PHONE_NUMBER, waLink, GENERIC_MSG } from "../data";
+import { PHONE_NUMBER, waLink } from "../data";
 import { useLanguage } from "../i18n";
 import { useAuth } from "../auth";
 import { useSalesRepAuth } from "../salesRepAuth";
@@ -61,7 +61,7 @@ export default function Header({ onLogoClick, onAdminClick, onSalesRepClick }) {
           </a>
           <a
             className="banner-btn banner-btn-whatsapp"
-            href={waLink(GENERIC_MSG)}
+            href={waLink(t("waGenericMsg"))}
             target="_blank"
             rel="noopener noreferrer"
           >
