@@ -33,8 +33,8 @@ function makeDb(physical) {
   db.approve = (id) => db.apply(approveOrder(db.orders, id, db.physical));
   db.reject = (id) => db.apply(rejectOrder(db.orders, id));
   db.cancel = (id) => db.apply(cancelOrder(db.orders, id));
-  db.dispatch = (id, sent) =>
-    db.apply(confirmDispatch(db.orders, id, sent, db.physical));
+  db.dispatch = (id, sent, extras = []) =>
+    db.apply(confirmDispatch(db.orders, id, sent, db.physical, new Date(), extras));
   db.status = (id) => db.orders.find((o) => o.id === id)?.status;
   return db;
 }
@@ -245,6 +245,94 @@ test("13d. a decrease and an increase can be mixed across lines of one order", (
   assert.deepEqual([db.available(A), db.available(B)], [750, 280]);
 });
 
+const C = "rings:3"; // a product that is NOT in the order below
+const extra = (key) => ({ key, folderId: key.split(":")[0], photoId: key.split(":")[1], caption: "Extra " + key });
+
+test("13e. admin can ADD a product that wasn't ordered; it comes out of free stock", () => {
+  const db = makeDb({ [A]: 1000, [C]: 200 });
+  db.create("o1", [line(A, 300)]);
+  db.approve("o1");
+  const r = db.dispatch("o1", { [A]: 300, [C]: 50 }, [extra(C)]);
+  assert.equal(r.ok, true);
+  assert.deepEqual([db.physical(A), db.physical(C)], [700, 150]);
+  assert.deepEqual([db.reserved(A), db.reserved(C)], [0, 0]);
+  const rec = db.orders[0].dispatchedLines.find((l) => l.key === C);
+  assert.deepEqual([rec.ordered, rec.dispatched, rec.added, rec.caption], [0, 50, true, "Extra rings:3"]);
+});
+
+test("13f. an ADDED product can't use stock reserved for another approved order", () => {
+  const db = makeDb({ [A]: 1000, [C]: 100 });
+  db.create("o1", [line(A, 300)]);
+  db.create("o2", [line(C, 80)]);
+  db.approve("o1");
+  db.approve("o2"); // 80 of C's 100 now held for o2 → 20 free
+  assert.equal(db.dispatch("o1", { [A]: 300, [C]: 21 }, [extra(C)]).code, "exceeds_available");
+  assert.equal(db.physical(C), 100); // nothing changed
+  assert.equal(db.dispatch("o1", { [A]: 300, [C]: 20 }, [extra(C)]).ok, true);
+  assert.equal(db.physical(C), 80);
+  assert.equal(db.reserved(C), 80); // o2 is still fully covered
+});
+
+test("13g. adding is validated: beyond stock, unknown product, duplicate of an ordered line, bad qty", () => {
+  const db = makeDb({ [A]: 1000, [B]: 400, [C]: 50 });
+  db.create("o1", [line(A, 300)]);
+  db.approve("o1");
+  assert.equal(db.dispatch("o1", { [A]: 300, [C]: 51 }, [extra(C)]).code, "insufficient_physical");
+  assert.equal(db.dispatch("o1", { [A]: 300, [C]: 5 }).code, "unknown_line"); // C sent without metadata
+  assert.equal(db.dispatch("o1", { [A]: 300 }, [extra(A)]).code, "duplicate_line"); // A is already ordered
+  assert.equal(db.dispatch("o1", { [A]: 300, [C]: 1.5 }, [extra(C)]).code, "invalid_quantity");
+  assert.equal(db.dispatch("o1", { [A]: 300 }, [extra(C)]).code, "invalid_quantity"); // quantity missing
+  assert.equal(db.dispatch("o1", { [A]: 300 }, [{ caption: "no key" }]).code, "invalid_extra");
+  assert.equal(db.status("o1"), STATUS.APPROVED);
+  assert.deepEqual([db.physical(A), db.physical(C)], [1000, 50]);
+});
+
+test("13h. an added product with quantity 0 is simply not added", () => {
+  const db = makeDb({ [A]: 1000, [C]: 50 });
+  db.create("o1", [line(A, 300)]);
+  db.approve("o1");
+  assert.equal(db.dispatch("o1", { [A]: 300, [C]: 0 }, [extra(C)]).ok, true);
+  assert.equal(db.orders[0].dispatchedLines.length, 1);
+  assert.equal(db.physical(C), 50);
+});
+
+test("13i. admin can REMOVE an ordered product: nothing deducted, reservation returns to available", () => {
+  const db = makeDb({ [A]: 1000, [B]: 400 });
+  db.create("o1", [line(A, 300), line(B, 100)]);
+  db.approve("o1");
+  assert.equal(db.dispatch("o1", { [A]: 300, [B]: 0 }).ok, true);
+  assert.equal(db.physical(B), 400); // untouched
+  assert.equal(db.available(B), 400); // its 100 are free again
+  const rec = db.orders[0].dispatchedLines.find((l) => l.key === B);
+  assert.deepEqual([rec.dispatched, rec.returned, rec.removed], [0, 100, true]);
+});
+
+test("13j. remove one product AND add another in the same dispatch", () => {
+  const db = makeDb({ [A]: 1000, [B]: 400, [C]: 200 });
+  db.create("o1", [line(A, 300), line(B, 100)]);
+  db.approve("o1");
+  assert.equal(db.dispatch("o1", { [A]: 300, [B]: 0, [C]: 60 }, [extra(C)]).ok, true);
+  assert.deepEqual([db.physical(A), db.physical(B), db.physical(C)], [700, 400, 140]);
+  assert.deepEqual([db.reserved(A), db.reserved(B), db.reserved(C)], [0, 0, 0]);
+});
+
+test("13k. removing everything and adding nothing is refused (use Cancel instead)", () => {
+  const db = makeDb({ [A]: 1000 });
+  db.create("o1", [line(A, 300)]);
+  db.approve("o1");
+  assert.equal(db.dispatch("o1", { [A]: 0 }).code, "nothing_dispatched");
+  assert.equal(db.status("o1"), STATUS.APPROVED);
+});
+
+test("13l. duplicate confirm after adding/removing still deducts only once", () => {
+  const db = makeDb({ [A]: 1000, [C]: 200 });
+  db.create("o1", [line(A, 300)]);
+  db.approve("o1");
+  assert.equal(db.dispatch("o1", { [A]: 250, [C]: 40 }, [extra(C)]).ok, true);
+  assert.equal(db.dispatch("o1", { [A]: 250, [C]: 40 }, [extra(C)]).code, "invalid_status");
+  assert.deepEqual([db.physical(A), db.physical(C)], [750, 160]);
+});
+
 test("14. dispatch can never push physical stock negative (stock edited down after approval)", () => {
   const db = makeDb({ [A]: 1000 });
   db.create("o1", [line(A, 300)]);
@@ -332,7 +420,15 @@ test("20. fuzz: 20,000 random operations never break the stock invariants", () =
         const o = db.orders.find((x) => x.id === pick());
         const sent = {};
         for (const l of o?.lines || []) sent[l.key] = rnd(l.pieces * 2 + 1); // sometimes MORE than ordered
-        db.dispatch(pick() === "none" ? "none" : o?.id ?? "none", sent);
+        // …and sometimes ADD a product that wasn't ordered
+        const extras = [];
+        const notIn = keys.filter((k) => !(o?.lines || []).some((l) => l.key === k));
+        if (o && notIn.length && rnd(3) === 0) {
+          const k = notIn[rnd(notIn.length)];
+          sent[k] = rnd(120);
+          extras.push({ key: k, folderId: k.split(":")[0], photoId: k.split(":")[1], caption: k });
+        }
+        db.dispatch(pick() === "none" ? "none" : o?.id ?? "none", sent, extras);
         break;
       }
       case 5: {
