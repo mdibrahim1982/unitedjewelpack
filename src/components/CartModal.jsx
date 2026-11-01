@@ -1,11 +1,17 @@
 import { useState } from "react";
-import { useLanguage } from "../i18n";
+import { useLanguage, translateFolderName } from "../i18n";
 import { useCart } from "../cartStore";
 import { usePhotoStore } from "../photoStore";
 import { useSalesRepAuth } from "../salesRepAuth";
 import { useAuth } from "../auth";
 import { useCustomer } from "../customerStore";
 import { validateDetails } from "../customerDetails";
+import {
+  collectKnownCustomers,
+  matchByShopName,
+  matchByMobile,
+  autofillFields,
+} from "../knownCustomers";
 import { roundTotal } from "../money";
 import { useOrders } from "../ordersStore";
 import { usePricing, formatMoney, parseStock, PCS_PER_UNIT } from "../pricingStore";
@@ -13,18 +19,18 @@ import { whatsappCartOrderLink, orderRefOf } from "../cartShare";
 import WhatsAppIcon from "./WhatsAppIcon";
 
 export default function CartModal({ onClose }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { items, removeFromCart, clearCart, totalQty } = useCart();
   const { priceFor, unitPriceOf } = usePricing();
   const { getFolder, updateStock } = usePhotoStore();
   const { salesRepName, isSalesRep } = useSalesRepAuth();
   const { isAdmin } = useAuth();
-  const { customer } = useCustomer();
+  const { customer, lastCustomer } = useCustomer();
   // Sales reps and admins order ON BEHALF of a shop, so they must type that
   // shop's details into the cart. A customer already gave theirs at login.
   const isStaff = isSalesRep || isAdmin;
   const placedBy = isSalesRep ? "salesRep" : isAdmin ? "admin" : "customer";
-  const { submitOrder } = useOrders();
+  const { submitOrder, orders } = useOrders();
   const [notice, setNotice] = useState(null);
 
   // Cart lines use the unit price AND the pieces-per-unit captured when
@@ -65,9 +71,24 @@ export default function CartModal({ onClose }) {
   const [fields, setFields] = useState({ shopName: "", location: "", mobile: "" });
   const [fieldErrors, setFieldErrors] = useState({});
 
+  // Shops we already know (past orders + the last customer on this device).
+  // Picking/typing one fills in its location and mobile — but only into
+  // fields that are still empty, so nothing already typed is overwritten.
+  const knownCustomers = collectKnownCustomers(orders, lastCustomer ? [lastCustomer] : []);
+
   function setField(name, value) {
-    setFields((prev) => ({ ...prev, [name]: value }));
-    if (fieldErrors[name]) setFieldErrors((prev) => ({ ...prev, [name]: undefined }));
+    setFields((prev) => {
+      const next = { ...prev, [name]: value };
+      const match =
+        name === "shopName"
+          ? matchByShopName(knownCustomers, value)
+          : name === "mobile"
+          ? matchByMobile(knownCustomers, value)
+          : null;
+      return match ? autofillFields(next, match) : next;
+    });
+    // clear any error on the fields that were just edited or auto-filled
+    setFieldErrors({});
   }
 
   // Miscellaneous charges exist only for staff; a customer never sees or
@@ -139,7 +160,14 @@ export default function CartModal({ onClose }) {
 
     // Open WhatsApp in the same click so the browser allows the pop-up.
     window.open(
-      whatsappCartOrderLink(items, extraAmount, details, orderRefOf(result.id)),
+      whatsappCartOrderLink(
+        items,
+        extraAmount,
+        details,
+        orderRefOf(result.id),
+        t,
+        (it) => translateFolderName(lang, it.folderSlug, it.folderName)
+      ),
       "_blank",
       "noopener,noreferrer"
     );
@@ -290,7 +318,7 @@ export default function CartModal({ onClose }) {
             <div className="cart-panel-footer">
               <div className="cart-summary">
                 {t.count("cartItemCount", items.length)} ·{" "}
-                {t("totalQtyLabel")}: {totalQty} ({totalPieces} pc)
+                {t("totalQtyLabel")}: {totalPieces} pc
               </div>
 
               {isStaff && (
@@ -298,6 +326,15 @@ export default function CartModal({ onClose }) {
                   <div className="cart-shop-details-title">
                     {t("customerDetailsTitle")}
                   </div>
+                  <datalist id="cart-known-shops">
+                    {knownCustomers.slice(0, 50).map((c) => (
+                      <option
+                        key={c.mobile || c.shopName}
+                        value={c.shopName}
+                        label={[c.location, c.mobile].filter(Boolean).join(" · ")}
+                      />
+                    ))}
+                  </datalist>
                   {[
                     ["shopName", "shopNameLabel", "shopNamePlaceholder", "text"],
                     ["location", "locationLabel", "locationPlaceholder", "text"],
@@ -309,6 +346,11 @@ export default function CartModal({ onClose }) {
                       </label>
                       <input
                         id={`cart-${name}`}
+                        name={name}
+                        autoComplete={
+                          name === "shopName" ? "organization" : name === "mobile" ? "tel-national" : "address-level2"
+                        }
+                        list={name === "shopName" ? "cart-known-shops" : undefined}
                         type={type}
                         inputMode={type === "tel" ? "tel" : undefined}
                         className={

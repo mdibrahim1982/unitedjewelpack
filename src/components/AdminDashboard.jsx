@@ -3,6 +3,9 @@ import { useLanguage, translateFolderName } from "../i18n";
 import { usePhotoStore } from "../photoStore";
 import { usePricing, formatMoney, parsePrice } from "../pricingStore";
 import AdminInventory from "./AdminInventory";
+import { hashBytes, bytesFromDataUrl } from "../imageHash";
+import { BASE_IMAGE_HASHES } from "../baseImageHashes";
+import { buildDuplicateIndex, addToIndex, checkUpload, fileStem } from "../duplicates";
 import AdminOrders from "./AdminOrders";
 import AdminDispatch from "./AdminDispatch";
 import { useOrders } from "../ordersStore";
@@ -67,6 +70,7 @@ export default function AdminDashboard({ onGoToSite }) {
   const [draftPrice, setDraftPrice] = useState("");
   const [priceSavedId, setPriceSavedId] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadNotice, setUploadNotice] = useState(null);
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [clickedHighlightId, setClickedHighlightId] = useState(null);
@@ -213,16 +217,97 @@ export default function AdminDashboard({ onGoToSite }) {
   }
 
   // Multiple images can be picked at once from the file picker.
+  // Every product already in the catalogue — shipped images, uploaded photos
+  // and anything sitting in a Backup folder — as { hash, fileName, ... }.
+  async function buildCatalogueIndex() {
+    const entries = [];
+    for (const f of folders) {
+      for (const p of f.photos) {
+        let hash = p.hash || BASE_IMAGE_HASHES[p.img] || null;
+        if (!hash && typeof p.img === "string" && p.img.startsWith("data:")) {
+          const bytes = bytesFromDataUrl(p.img);
+          if (bytes) hash = await hashBytes(bytes); // older upload saved before hashes were kept
+        }
+        entries.push({
+          hash,
+          fileName: p.fileName || (p.img?.startsWith("data:") ? "" : p.img),
+          folderId: f.id,
+          folderName: f.name,
+          caption: p.caption || "",
+          backup: !!f.adminOnly,
+        });
+      }
+    }
+    return buildDuplicateIndex(entries);
+  }
+
   async function handleFileChange(e) {
     const files = Array.from(e.target.files || []);
     if (files.length === 0 || !activeFolder) return;
     setUploading(true);
+    setUploadNotice(null);
     try {
-      const dataUrls = await Promise.all(files.map(fileToDataUrl));
-      addPhotos(
-        activeFolder.id,
-        dataUrls.map((img) => ({ img, caption: "", price: null }))
-      );
+      const index = await buildCatalogueIndex();
+      const accepted = [];
+      const skipped = [];
+      for (const file of files) {
+        const hash = await hashBytes(new Uint8Array(await file.arrayBuffer()));
+        const dup = checkUpload({ hash, fileName: file.name }, index);
+        const where = dup?.entry;
+        if (dup?.reason === "same_image") {
+          skipped.push(
+            where.backup
+              ? t("dupInBackup", { file: file.name, folder: where.folderName })
+              : t("dupSameImage", {
+                  file: file.name,
+                  caption: where.caption || fileStem(where.fileName),
+                  folder: where.folderName,
+                })
+          );
+          continue;
+        }
+        if (dup?.reason === "same_name") {
+          const keep = window.confirm(
+            t("dupNameConfirm", {
+              file: file.name,
+              caption: where.caption || where.fileName,
+              folder: where.folderName,
+            })
+          );
+          if (!keep) {
+            skipped.push(t("dupSkippedName", { file: file.name }));
+            continue;
+          }
+        }
+        accepted.push({ file, hash });
+        // so the same file twice in ONE selection is caught too
+        addToIndex(index, {
+          hash,
+          fileName: file.name,
+          folderId: activeFolder.id,
+          folderName: activeFolder.name,
+          caption: "",
+        });
+      }
+
+      if (accepted.length > 0) {
+        const dataUrls = await Promise.all(accepted.map((a) => fileToDataUrl(a.file)));
+        addPhotos(
+          activeFolder.id,
+          dataUrls.map((img, i) => ({
+            img,
+            caption: "",
+            price: null,
+            hash: accepted[i].hash,
+            fileName: accepted[i].file.name,
+          }))
+        );
+      }
+      setUploadNotice({
+        type: skipped.length ? (accepted.length ? "ok" : "error") : "ok",
+        added: accepted.length,
+        skipped,
+      });
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -534,6 +619,32 @@ export default function AdminDashboard({ onGoToSite }) {
                 </button>
               )}
             </div>
+
+            {uploadNotice && (
+              <div
+                className={
+                  "cart-notice upload-notice" +
+                  (uploadNotice.type === "error" ? " cart-notice-error" : "")
+                }
+                role="status"
+              >
+                <strong>
+                  {uploadNotice.added > 0
+                    ? t("uploadAdded", { n: uploadNotice.added })
+                    : t("uploadNothing")}
+                </strong>
+                {uploadNotice.skipped.length > 0 && (
+                  <>
+                    <div>{t("uploadSkipped", { n: uploadNotice.skipped.length })}</div>
+                    <ul>
+                      {uploadNotice.skipped.map((line, i) => (
+                        <li key={i}>{line}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </div>
+            )}
 
             <div className="admin-photos-head">
               <h3 className="admin-photos-heading">{t("photosInFolder")}</h3>
