@@ -20,11 +20,17 @@ export function orderRefOf(id) {
   return String(id || "").slice(-5).toUpperCase();
 }
 
+// `tr(key, vars)` is the app's translate function, so the message is written
+// in the language the shopper is using (English or Tamil). `folderNameOf(item)`
+// supplies the folder name in that language too. Product captions are kept
+// exactly as they appear in the catalogue.
 export function buildCartOrderMessage(
   items,
   extraAmount = 0,
   shopDetails = {},
-  orderRef = ""
+  orderRef = "",
+  tr = (key) => key,
+  folderNameOf = (it) => it.folderName
 ) {
   const unitOf = (it) => {
     const own = Number(it.unitPrice);
@@ -43,34 +49,40 @@ export function buildCartOrderMessage(
   const location = (shopDetails.location || "").trim();
   const mobile = (shopDetails.mobile || "").trim();
   const salesRepName = (shopDetails.salesRepName || "").trim();
+
+  const itemLine = (it, i) =>
+    `${i + 1}. ${it.caption || tr("wa_untitled")} — ${folderNameOf(it)} — ` +
+    tr("wa_qty", { qty: it.qty, unit: qtyUnitOf(it), pcs: piecesOf(it) }) +
+    (unitOf(it) === 0
+      ? ` — ${tr("wa_priceOnRequest")}`
+      : ` — ₹${unitOf(it)}/pc — ₹${lineTotal(it)}`);
+
   const lines = [
-    "Hi! I'd like to place an order for the following boxes:",
-    ...(orderRef ? [`Order ref: #${orderRef}`] : []),
-    ...(shopName ? [`Shop Name: ${shopName}`] : []),
-    ...(location ? [`Location: ${location}`] : []),
-    ...(mobile ? [`Mobile: ${mobile}`] : []),
-    ...(salesRepName ? [`Sales Rep: ${salesRepName}`] : []),
-    ...(shopDetails.placedBy === "admin" ? ["Placed by: Admin"] : []),
+    tr("wa_greeting"),
+    ...(orderRef ? [tr("wa_orderRef", { ref: orderRef })] : []),
+    ...(shopName ? [tr("wa_shopName", { value: shopName })] : []),
+    ...(location ? [tr("wa_location", { value: location })] : []),
+    ...(mobile ? [tr("wa_mobile", { value: mobile })] : []),
+    ...(salesRepName ? [tr("wa_salesRep", { value: salesRepName })] : []),
+    ...(shopDetails.placedBy === "admin" ? [tr("wa_placedByAdmin")] : []),
     "",
-    ...items.map(
-      (it, i) =>
-        `${i + 1}. ${it.caption || "Untitled"} — ${it.folderName} — Qty: ${
-          it.qty
-        } ${qtyUnitOf(it)} (${piecesOf(it)} pc)` +
-        (unitOf(it) === 0
-          ? " — price on request"
-          : ` — ₹${unitOf(it)}/pc — ₹${lineTotal(it)}`)
-    ),
-    ...(safeExtra > 0 ? ["", `Extra charge: ₹${safeExtra}`] : []),
+    ...items.map(itemLine),
+    ...(safeExtra > 0 ? ["", tr("wa_extraCharge", { value: safeExtra })] : []),
     ...(roundOff !== 0
-      ? ["", `Amount: ₹${amount}`, `Round off: ${roundOff > 0 ? "+" : "-"}₹${Math.abs(roundOff)}`]
+      ? [
+          "",
+          tr("wa_amount", { value: amount }),
+          tr("wa_roundOff", { sign: roundOff > 0 ? "+" : "-", value: Math.abs(roundOff) }),
+        ]
       : []),
     "",
-    `Total: ${items.length} item${
-      items.length === 1 ? "" : "s"
-    }, ${totalPieces} pc — ₹${totalValue}`,
+    tr(items.length === 1 ? "wa_total_one" : "wa_total_other", {
+      count: items.length,
+      pcs: totalPieces,
+      total: totalValue,
+    }),
     "",
-    "Please review and approve this order. Thank you!",
+    tr("wa_closing"),
   ];
   return lines.join("\n");
 }
@@ -79,7 +91,11 @@ export function whatsappCartOrderLink(
   items,
   extraAmount = 0,
   shopDetails = {},
-  orderRef = ""
+  orderRef = "",
+  tr,
+  folderNameOf
 ) {
-  return waLink(buildCartOrderMessage(items, extraAmount, shopDetails, orderRef));
+  return waLink(
+    buildCartOrderMessage(items, extraAmount, shopDetails, orderRef, tr, folderNameOf)
+  );
 }

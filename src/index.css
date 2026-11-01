@@ -1300,3 +1300,63 @@ header.site.banner::after{ display:none; }
 }
 .session-blocked-card{ text-align:center; }
 .session-blocked-icon{ font-size:34px; margin-bottom:6px; }
+
+/* ---------- Footer slogan (customers, landing page only) ---------- */
+.footer-slogan{
+  text-align:center; padding:6px 0 22px; margin-bottom:22px;
+  border-bottom:1px solid var(--line);
+}
+.footer-slogan-text{
+  position:relative; max-width:760px; margin:0 auto;
+  font-size:19px; line-height:1.55; color:var(--terracotta-d);
+}
+.footer-slogan-text::before,
+.footer-slogan-text::after{
+  content:""; display:block; width:56px; height:2px; margin:0 auto;
+  background:linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+.footer-slogan-text::before{ margin-bottom:12px; }
+.footer-slogan-text::after{ margin-top:12px; }
+@media (max-width:640px){ .footer-slogan-text{ font-size:15.5px; } }
+
+.customer-login-prefill{
+  margin:0 0 14px; padding:8px 12px; font-size:12.5px; line-height:1.5;
+  color:var(--ink-soft); background:var(--cream-deep);
+  border:1px dashed var(--line); border-radius:10px;
+}
+
+.upload-notice{ margin:0 0 14px; line-height:1.5; }
+.upload-notice ul{ margin:6px 0 0; padding-left:18px; font-size:12.5px; }
+
+/* ---------- Dispatch: remove / add products ---------- */
+.order-line-removed .order-line-name{ text-decoration:line-through; color:var(--ink-soft); }
+.order-line-removed{ background:rgba(178,58,58,.04); }
+.dispatch-removed-note{ font-size:12.5px; font-weight:600; color:#B23A3A; }
+.dispatch-remove{ font-size:12px; }
+.dispatch-extras{ margin-top:6px; }
+.order-extra-lines{ margin-bottom:6px; }
+.order-line-added{ background:rgba(62,142,82,.05); }
+.order-added-badge{
+  display:inline-block; margin-left:6px; padding:1px 8px; border-radius:999px;
+  font-size:11px; font-weight:600; background:#DFF3E4; color:#27693A;
+}
+.dispatch-add{
+  position:relative; margin-top:10px; padding-top:10px; border-top:1px dashed var(--line);
+}
+.dispatch-add-label{ display:block; font-size:12.5px; font-weight:600; color:var(--terracotta-d); margin-bottom:6px; }
+.dispatch-add-input{ margin:0; max-width:420px; }
+.dispatch-add-none{ margin:6px 0 0; font-size:12.5px; color:var(--ink-soft); }
+.dispatch-add-results{
+  list-style:none; margin:6px 0 0; padding:4px; max-width:420px;
+  background:var(--paper); border:1px solid var(--line); border-radius:12px;
+  box-shadow:0 8px 20px var(--shadow);
+}
+.dispatch-add-result{
+  display:flex; flex-direction:column; align-items:flex-start; gap:1px; width:100%;
+  padding:8px 10px; border-radius:8px; text-align:left; cursor:pointer;
+}
+.dispatch-add-result:hover:not(:disabled){ background:var(--cream-deep); }
+.dispatch-add-result:disabled{ opacity:.5; cursor:not-allowed; }
+.dispatch-add-name{ font-size:13.5px; color:var(--ink); }
+.dispatch-add-result small{ font-size:12px; color:var(--ink-soft); }
+.dispatch-nothing{ align-self:center; }

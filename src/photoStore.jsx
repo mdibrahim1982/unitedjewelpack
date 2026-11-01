@@ -158,11 +158,14 @@ export function PhotoStoreProvider({ children }) {
     updatePatch(folderId, (patch) => ({
       ...patch,
       added: [
-        ...photos.map(({ img, caption, price }, i) => ({
+        ...photos.map(({ img, caption, price, hash, fileName }, i) => ({
           id: `new-${stamp}-${i}-${Math.random().toString(36).slice(2, 7)}`,
           img,
           caption: caption || "",
           price: price ?? null,
+          // kept so a re-upload of the same picture can be recognised
+          hash: hash ?? null,
+          fileName: fileName ?? null,
         })),
         ...patch.added,
       ],
@@ -297,6 +300,8 @@ export function PhotoStoreProvider({ children }) {
             img: photo.img,
             caption: photo.caption,
             price: photo.price ?? null,
+            hash: photo.hash ?? null,
+            fileName: photo.fileName ?? null,
             stock: photo.stock ?? null,
             fromFolderId: folderId,
           })),
@@ -361,6 +366,8 @@ export function PhotoStoreProvider({ children }) {
             img: photo.img,
             caption: photo.caption,
             price: photo.price ?? null,
+            hash: photo.hash ?? null,
+            fileName: photo.fileName ?? null,
             stock: photo.stock ?? null,
           })),
         ],

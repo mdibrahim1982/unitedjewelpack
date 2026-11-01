@@ -130,8 +130,11 @@ export function OrdersProvider({ children }) {
   const rejectOrder = (id) => transact((latest) => ledgerReject(latest, id));
   const cancelOrder = (id) => transact((latest) => ledgerCancel(latest, id));
   // dispatched: { [lineKey]: piecesActuallySent }
-  const confirmDispatch = (id, dispatched) =>
-    transact((latest) => ledgerDispatch(latest, id, dispatched, physicalOf));
+  // extraLines: products ADDED to this dispatch that weren't in the order
+  const confirmDispatch = (id, dispatched, extraLines = []) =>
+    transact((latest) =>
+      ledgerDispatch(latest, id, dispatched, physicalOf, new Date(), extraLines)
+    );
 
   const reserved = reservedMap(orders);
   // Pieces reserved for one product by approved, not-yet-dispatched orders.
