@@ -72,7 +72,7 @@ export function describeOrderError(t, result, captionOf) {
 // One order: who/where/when, then its lines. `lineExtra(line)` lets a
 // screen add per-line content (availability hint, dispatch input);
 // `children` is the action row.
-export default function OrderCard({ order, lineExtra, children }) {
+export default function OrderCard({ order, lineExtra, lineClass, afterLines, children }) {
   const { t } = useLanguage();
   const qtyText = useQtyText();
 
@@ -105,7 +105,10 @@ export default function OrderCard({ order, lineExtra, children }) {
 
       <ul className="order-lines">
         {order.lines.map((l) => (
-          <li key={l.key} className="order-line">
+          <li
+            key={l.key}
+            className={"order-line" + (lineClass && lineClass(l) ? " " + lineClass(l) : "")}
+          >
             <div className="order-line-main">
               <span className="order-line-name">{l.caption || l.key}</span>
               <span className="order-line-qty">
@@ -117,17 +120,22 @@ export default function OrderCard({ order, lineExtra, children }) {
         ))}
       </ul>
 
+      {afterLines}
+
       {order.dispatchedLines && (
         <ul className="order-dispatched">
           {order.dispatchedLines.map((d) => {
             const name =
-              order.lines.find((l) => l.key === d.key)?.caption || d.key;
+              d.caption || order.lines.find((l) => l.key === d.key)?.caption || d.key;
             return (
               <li key={d.key}>
-                {name}: {t("orderDispatchedLabel")} {d.dispatched} / {d.ordered}{" "}
-                PC(s)
-                {d.returned > 0 ? ` (${d.returned} ${t("orderReturnedLabel")})` : ""}
-                {d.extra > 0 ? ` (+${d.extra} ${t("orderExtraLabel")})` : ""}
+                {name}:{" "}
+                {d.removed
+                  ? t("orderRemovedLabel")
+                  : `${t("orderDispatchedLabel")} ${d.dispatched}${d.ordered > 0 ? ` / ${d.ordered}` : ""} PC(s)`}
+                {d.added ? ` (${t("orderAddedLabel")})` : ""}
+                {d.returned > 0 && !d.removed ? ` (${d.returned} ${t("orderReturnedLabel")})` : ""}
+                {d.extra > 0 && !d.added ? ` (+${d.extra} ${t("orderExtraLabel")})` : ""}
               </li>
             );
           })}

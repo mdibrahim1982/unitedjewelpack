@@ -12,12 +12,13 @@ import WhatsAppFloat from "./components/WhatsAppFloat";
 import BackToTopFloat from "./components/BackToTopFloat";
 import CartFloat from "./components/CartFloat";
 import CartModal from "./components/CartModal";
-import { LanguageProvider, useLanguage } from "./i18n";
+import { LanguageProvider } from "./i18n";
 import { AuthProvider, useAuth } from "./auth";
 import { SalesRepAuthProvider, useSalesRepAuth } from "./salesRepAuth";
 import { PhotoStoreProvider, usePhotoStore } from "./photoStore";
 import { CartProvider } from "./cartStore";
 import { OrdersProvider } from "./ordersStore";
+import { RemoteInventoryProvider } from "./firebase/RemoteInventory";
 import { CustomerProvider, useCustomer } from "./customerStore";
 import { PricingProvider } from "./pricingStore";
 
@@ -46,7 +47,6 @@ function AppRoutes() {
   const { isAdmin } = useAuth();
   const { isSalesRep } = useSalesRepAuth();
   const { isCustomer } = useCustomer();
-  const { t } = useLanguage();
   const { folders } = usePhotoStore();
   const folderSlugs = folders
     .filter((f) => !f.adminOnly)
@@ -90,6 +90,10 @@ function AppRoutes() {
   const staffRoute = route.name === "admin" || route.name === "sales";
   const needsCustomerLogin = !isAdmin && !isSalesRep && !isCustomer && !staffRoute;
 
+  // The company slogan lives in the footer and is for CUSTOMERS only (anyone
+  // who isn't staff) and only on the landing (home) page.
+  const showSlogan = !isAdmin && !isSalesRep && route.name === "home";
+
   return (
     <>
       <Header
@@ -98,9 +102,6 @@ function AppRoutes() {
         onSalesRepClick={openSalesRep}
       />
 
-      <section className="slogan-section">
-        <p className="slogan-text serif">{t("slogan")}</p>
-      </section>
 
       {route.name === "admin" &&
         (isAdmin ? (
@@ -132,7 +133,7 @@ function AppRoutes() {
         <FolderGrid onOpenFolder={openFolder} />
       )}
 
-      <Footer />
+      <Footer showSlogan={showSlogan} />
       {!needsCustomerLogin && (
         <CartFloat onClick={() => setCartOpen(true)} />
       )}
@@ -151,6 +152,7 @@ export default function App() {
       <AuthProvider>
         <SalesRepAuthProvider>
          <CustomerProvider>
+          <RemoteInventoryProvider>
           <PhotoStoreProvider>
             <OrdersProvider>
               <CartProvider>
@@ -160,6 +162,7 @@ export default function App() {
               </CartProvider>
             </OrdersProvider>
           </PhotoStoreProvider>
+          </RemoteInventoryProvider>
          </CustomerProvider>
         </SalesRepAuthProvider>
       </AuthProvider>

@@ -172,9 +172,19 @@ export function cancelOrder(orders, id, now = new Date()) {
 // out of free stock). Sending more is only allowed from stock that is
 // actually free: never from pieces reserved for OTHER approved orders, and
 // never more than is physically on hand.
+// The admin may also REMOVE an ordered product (dispatch 0 of it — it is
+// recorded as removed and its reservation simply goes back to available) or
+// ADD a product that wasn't ordered (`extraLines`), taken from free stock.
 // Returns stockDeltas (negative numbers) for the caller to apply to
 // physical stock in the same transaction as the order update.
-export function confirmDispatch(orders, id, dispatched, physical, now = new Date()) {
+export function confirmDispatch(
+  orders,
+  id,
+  dispatched,
+  physical,
+  now = new Date(),
+  extraLines = []
+) {
   const { idx, order } = findOrder(orders, id);
   if (!order) return { ok: false, code: "not_found" };
   // Status check doubles as the duplicate-click guard: once dispatched,
@@ -183,8 +193,20 @@ export function confirmDispatch(orders, id, dispatched, physical, now = new Date
     return { ok: false, code: "invalid_status", status: order.status };
   }
   const lineKeys = new Set(order.lines.map((l) => l.key));
+  // Products the admin ADDED to this dispatch that weren't in the order.
+  // Each needs { key, folderId, photoId, caption } so it can be recorded.
+  const extraByKey = new Map();
+  for (const x of extraLines || []) {
+    if (!x || !x.key) return { ok: false, code: "invalid_extra" };
+    if (lineKeys.has(x.key) || extraByKey.has(x.key)) {
+      return { ok: false, code: "duplicate_line", key: x.key };
+    }
+    extraByKey.set(x.key, x);
+  }
   for (const k of Object.keys(dispatched || {})) {
-    if (!lineKeys.has(k)) return { ok: false, code: "unknown_line", key: k };
+    if (!lineKeys.has(k) && !extraByKey.has(k)) {
+      return { ok: false, code: "unknown_line", key: k };
+    }
   }
 
   const reservedAll = reservedMap(orders);
@@ -214,14 +236,47 @@ export function confirmDispatch(orders, id, dispatched, physical, now = new Date
       key: l.key,
       folderId: l.folderId,
       photoId: l.photoId,
+      caption: l.caption,
       ordered: l.pieces,
       dispatched: sent,
       returned: Math.max(0, l.pieces - sent), // shortfall: back to available
       extra: Math.max(0, sent - l.pieces), // sent over the ordered quantity
+      removed: sent === 0, // taken out of this dispatch altogether
     });
     if (sent > 0) {
       stockDeltas.push({ key: l.key, folderId: l.folderId, photoId: l.photoId, delta: -sent });
     }
+  }
+  // Added products come out of free stock: never stock held for another
+  // approved order (this order has no reservation on them), never more than
+  // is physically on hand. A quantity of 0 simply means "not added".
+  for (const x of extraByKey.values()) {
+    const sent = dispatched?.[x.key];
+    if (!isWholeNonNegative(sent)) {
+      return { ok: false, code: "invalid_quantity", key: x.key, value: sent };
+    }
+    if (sent === 0) continue;
+    const onHand = physicalOf(physical, x.key);
+    if (sent > onHand) {
+      return { ok: false, code: "insufficient_physical", key: x.key, value: sent, max: onHand };
+    }
+    const maxSendable = Math.max(0, onHand - (reservedAll[x.key] || 0));
+    if (sent > maxSendable) {
+      return { ok: false, code: "exceeds_available", key: x.key, value: sent, max: maxSendable };
+    }
+    total += sent;
+    dispatchedLines.push({
+      key: x.key,
+      folderId: x.folderId,
+      photoId: x.photoId,
+      caption: x.caption,
+      ordered: 0,
+      dispatched: sent,
+      returned: 0,
+      extra: sent,
+      added: true, // not part of the original order
+    });
+    stockDeltas.push({ key: x.key, folderId: x.folderId, photoId: x.photoId, delta: -sent });
   }
   if (total === 0) return { ok: false, code: "nothing_dispatched" };
 

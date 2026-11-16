@@ -21,24 +21,32 @@ export default function AdminLogin({ onSuccess }) {
   const { t } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(false);
+  const [error, setError] = useState(null); // null, or a result code
+  const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    const ok = login(email, password);
-    if (ok === "blocked") {
-      // Someone signed in from another tab after this form appeared. Reload
-      // so the screen reflects it (and shows the "log out first" panel)
-      // rather than claiming the password was wrong.
-      window.location.reload();
-      return;
-    }
-    if (ok === true) {
-      setError(false);
-      onSuccess();
-    } else {
-      setError(true);
+    if (busy) return;
+    setBusy(true);
+    try {
+      // Firebase sign-in is asynchronous (a network round-trip).
+      const result = await login(email, password);
+      if (result === "blocked") {
+        // Someone signed in from another tab after this form appeared. Reload
+        // so the screen reflects it (and shows the "log out first" panel)
+        // rather than claiming the password was wrong.
+        window.location.reload();
+        return;
+      }
+      if (result === true) {
+        setError(null);
+        onSuccess();
+        return;
+      }
+      setError(result === false ? "bad_credentials" : result);
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -125,10 +133,18 @@ export default function AdminLogin({ onSuccess }) {
           </button>
         </div>
 
-        {error && <p className="field-error">{t("invalidCredentials")}</p>}
+        {error && (
+          <p className="field-error" role="alert">
+            {t(`loginError_${error}`)}
+          </p>
+        )}
 
-        <button className="btn btn-solid admin-login-submit" type="submit">
-          {t("signIn")}
+        <button
+          className="btn btn-solid admin-login-submit"
+          type="submit"
+          disabled={busy}
+        >
+          {busy ? t("signingIn") : t("signIn")}
         </button>
       </form>
     </section>

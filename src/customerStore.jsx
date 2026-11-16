@@ -13,6 +13,20 @@ import { SESSION_KEYS, currentBlocker } from "./activeSession";
 
 const KEY = SESSION_KEYS.customer;
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // one year
+// Separate from the signed-in session: kept after logout purely so the login
+// form can be pre-filled next time. "Not you? Clear" removes it.
+const LAST_KEY = "ujp_last_customer";
+
+function readLast() {
+  try {
+    const raw = localStorage.getItem(LAST_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    const checked = parsed ? validateDetails(parsed) : null;
+    return checked && checked.ok ? checked.values : null;
+  } catch {
+    return null;
+  }
+}
 
 function readCookie() {
   try {
@@ -70,6 +84,7 @@ const CustomerContext = createContext(null);
 
 export function CustomerProvider({ children }) {
   const [customer, setCustomer] = useState(readSaved);
+  const [lastCustomer, setLastCustomer] = useState(readLast);
 
   // Stay in step with another tab logging in/out.
   useEffect(() => {
@@ -88,7 +103,13 @@ export function CustomerProvider({ children }) {
     const checked = validateDetails(details);
     if (!checked.ok) return checked;
     writeSaved(checked.values);
+    try {
+      localStorage.setItem(LAST_KEY, JSON.stringify(checked.values));
+    } catch {
+      /* ignore */
+    }
     setCustomer(checked.values);
+    setLastCustomer(checked.values);
     return checked;
   }
 
@@ -97,9 +118,26 @@ export function CustomerProvider({ children }) {
     setCustomer(null);
   }
 
+  // "Not you? Clear" — forget the remembered details completely.
+  function forgetLastCustomer() {
+    try {
+      localStorage.removeItem(LAST_KEY);
+    } catch {
+      /* ignore */
+    }
+    setLastCustomer(null);
+  }
+
   return (
     <CustomerContext.Provider
-      value={{ customer, isCustomer: !!customer, login, logout }}
+      value={{
+        customer,
+        isCustomer: !!customer,
+        lastCustomer,
+        login,
+        logout,
+        forgetLastCustomer,
+      }}
     >
       {children}
     </CustomerContext.Provider>

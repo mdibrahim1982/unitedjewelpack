@@ -7,8 +7,22 @@ import { useCustomer } from "../customerStore";
 // attaches it to every order they place.
 export default function CustomerLogin({ onSalesRep, onAdmin }) {
   const { t } = useLanguage();
-  const { login } = useCustomer();
-  const [fields, setFields] = useState({ shopName: "", location: "", mobile: "" });
+  const { login, lastCustomer, forgetLastCustomer } = useCustomer();
+  // Pre-fill with whoever used this device last, so a returning shop only has
+  // to press Continue.
+  const [fields, setFields] = useState({
+    shopName: lastCustomer?.shopName || "",
+    location: lastCustomer?.location || "",
+    mobile: lastCustomer?.mobile || "",
+  });
+  const [prefilled, setPrefilled] = useState(!!lastCustomer);
+
+  function clearRemembered() {
+    forgetLastCustomer();
+    setFields({ shopName: "", location: "", mobile: "" });
+    setErrors({});
+    setPrefilled(false);
+  }
   const [errors, setErrors] = useState({});
   const [blocked, setBlocked] = useState(null);
 
@@ -39,6 +53,15 @@ export default function CustomerLogin({ onSalesRep, onAdmin }) {
         </h1>
         <p className="page-sub">{t("customerLoginSubtitle")}</p>
 
+        {prefilled && (
+          <p className="customer-login-prefill">
+            {t("autofillNote")}{" "}
+            <button type="button" className="link-btn" onClick={clearRemembered}>
+              {t("autofillClear")}
+            </button>
+          </p>
+        )}
+
         {blocked && (
           <p className="cart-notice cart-notice-error" role="alert">
             {t("sessionBlockedText", {
@@ -55,6 +78,7 @@ export default function CustomerLogin({ onSalesRep, onAdmin }) {
             </label>
             <input
               id={`cust-${name}`}
+              name={name}
               className={"field-input" + (errors[name] ? " field-input-error" : "")}
               type={type}
               inputMode={type === "tel" ? "tel" : undefined}

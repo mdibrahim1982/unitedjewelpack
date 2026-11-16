@@ -1,0 +1,157 @@
+rules_version = '2';
+
+// ===================== United Jewel Pack — Firestore Security Rules =====================
+//
+// WHO CAN DO WHAT
+//   Anyone (even signed out)   read the catalogue's stock & prices  (inventory)
+//   Customer (anonymous login) create ONE kind of document: a pending order of their own
+//   Sales rep                  create pending orders for themselves; read only their own orders
+//   Admin                      read every order; approve / reject / cancel / dispatch; edit inventory
+//   Nobody                     delete anything (history is never destroyed from the app)
+//
+// ROLES come from documents you create in the Firebase console, never from the browser:
+//   admins/{uid}      → that Firebase Auth user is an admin
+//   salesReps/{uid}   → that user is a sales rep   (set  active: false  to switch them off)
+//
+// STOCK is only changed by an admin, and the app does it inside one transaction together with
+// the order status. The rules below additionally guarantee that stock can never go negative,
+// that "reserved" can never exceed "physical", and that an order can only move forward:
+//   pending → approved | rejected | cancelled      approved → dispatched | cancelled
+// and that a dispatched order (stockDeducted = true) can never be changed again — which is what
+// makes a second "dispatch" (and so a second stock deduction) impossible.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------- helpers
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isActiveRep() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/salesReps/$(request.auth.uid))
+        && get(/databases/$(database)/documents/salesReps/$(request.auth.uid)).data.get('active', true) == true;
+    }
+
+    // customers use an anonymous Firebase identity (no password)
+    function isAnonymous() {
+      return signedIn() && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
+    // ------------------------------------------------------------------ roles
+    match /admins/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;   // so the app can learn "am I an admin?"
+      allow write: if false;                                   // create these in the console only
+    }
+
+    match /salesReps/{uid} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow create, update: if isAdmin()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 60
+        && request.resource.data.get('active', true) is bool;
+      allow delete: if false;
+    }
+
+    // -------------------------------------------------------------- inventory
+    // one document per product, id = "folderId:photoId"
+    function validInventory(d) {
+      return d.keys().hasOnly(['physical', 'reserved', 'price', 'folderId', 'photoId', 'updatedAt'])
+        && d.physical is int && d.physical >= 0 && d.physical <= 1000000
+        && d.reserved is int && d.reserved >= 0 && d.reserved <= d.physical
+        && (d.get('price', null) == null
+            || (d.price is number && d.price >= 0 && d.price <= 100000));
+    }
+
+    match /inventory/{productKey} {
+      allow read: if true;
+      allow create, update: if isAdmin() && validInventory(request.resource.data);
+      allow delete: if false;
+    }
+
+    // ----------------------------------------------------------------- orders
+    // fields a customer / sales rep may send when creating an order
+    function validNewOrder(d, orderId) {
+      return d.keys().hasOnly(['id', 'lines', 'items', 'extraAmount', 'itemsTotal', 'roundOff',
+                               'totalValue', 'shopName', 'location', 'mobile', 'salesRepName',
+                               'salesRepUid', 'customerUid', 'placedBy', 'status', 'createdAt'])
+        && d.id == orderId
+        && d.status == 'pending'                       // no reservedLines / stockDeducted possible
+        && d.lines is list && d.lines.size() >= 1 && d.lines.size() <= 100
+        && d.shopName is string && d.shopName.size() >= 2 && d.shopName.size() <= 80
+        && d.location is string && d.location.size() >= 2 && d.location.size() <= 80
+        && d.mobile is string && d.mobile.matches('^[6-9][0-9]{9}$')
+        && d.totalValue is number && d.totalValue >= 0 && d.totalValue <= 100000000
+        && d.createdAt is string && d.createdAt.size() <= 40;
+    }
+
+    function validRepOrder(orderId) {
+      return isActiveRep()
+        && validNewOrder(request.resource.data, orderId)
+        && request.resource.data.placedBy == 'salesRep'
+        && request.resource.data.salesRepUid == request.auth.uid
+        && !('customerUid' in request.resource.data);
+    }
+
+    function validCustomerOrder(orderId) {
+      return isAnonymous()
+        && validNewOrder(request.resource.data, orderId)
+        && request.resource.data.placedBy == 'customer'
+        && request.resource.data.customerUid == request.auth.uid
+        && !('salesRepUid' in request.resource.data);
+    }
+
+    // what an admin may change on an existing order
+    function validTransition(before, after) {
+      return after.id == before.id
+        && after.lines == before.lines
+        && after.shopName == before.shopName
+        && after.mobile == before.mobile
+        && after.totalValue == before.totalValue
+        && after.placedBy == before.placedBy
+        && after.createdAt == before.createdAt
+        && after.get('salesRepUid', '') == before.get('salesRepUid', '')
+        && after.get('customerUid', '') == before.get('customerUid', '')
+        && before.get('stockDeducted', false) == false          // a dispatched order is frozen
+        && (
+             (before.status == 'pending'  && after.status in ['approved', 'rejected', 'cancelled'])
+          || (before.status == 'approved' && after.status in ['dispatched', 'cancelled'])
+        )
+        && (after.status == 'dispatched'
+              ? after.get('stockDeducted', false) == true
+              : after.get('stockDeducted', false) == false);
+    }
+
+    match /orders/{orderId} {
+      // `resource == null` lets the app check "does this id already exist?" before creating
+      // (it learns nothing but "no"); real orders are visible only to their owner or an admin.
+      allow read: if isAdmin()
+        || resource == null
+        || (signedIn() && 'salesRepUid' in resource.data
+            && resource.data.salesRepUid == request.auth.uid)
+        || (signedIn() && 'customerUid' in resource.data
+            && resource.data.customerUid == request.auth.uid);
+
+      // an admin may create any order (also used by the one-time migration);
+      // reps and customers may only create a pending order of their own.
+      allow create: if isAdmin() || validRepOrder(orderId) || validCustomerOrder(orderId);
+
+      allow update: if isAdmin() && validTransition(resource.data, request.resource.data);
+      allow delete: if false;
+    }
+
+    // ------------------------------------------------- migration bookkeeping
+    match /meta/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // everything else is closed
+  }
+}

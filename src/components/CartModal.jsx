@@ -1,11 +1,17 @@
-import { useState } from "react";
-import { useLanguage } from "../i18n";
+import { useRef, useState } from "react";
+import { useLanguage, translateFolderName } from "../i18n";
 import { useCart } from "../cartStore";
 import { usePhotoStore } from "../photoStore";
 import { useSalesRepAuth } from "../salesRepAuth";
 import { useAuth } from "../auth";
 import { useCustomer } from "../customerStore";
 import { validateDetails } from "../customerDetails";
+import {
+  collectKnownCustomers,
+  matchByShopName,
+  matchByMobile,
+  autofillFields,
+} from "../knownCustomers";
 import { roundTotal } from "../money";
 import { useOrders } from "../ordersStore";
 import { usePricing, formatMoney, parseStock, PCS_PER_UNIT } from "../pricingStore";
@@ -13,18 +19,20 @@ import { whatsappCartOrderLink, orderRefOf } from "../cartShare";
 import WhatsAppIcon from "./WhatsAppIcon";
 
 export default function CartModal({ onClose }) {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { items, removeFromCart, clearCart, totalQty } = useCart();
   const { priceFor, unitPriceOf } = usePricing();
   const { getFolder, updateStock } = usePhotoStore();
   const { salesRepName, isSalesRep } = useSalesRepAuth();
   const { isAdmin } = useAuth();
-  const { customer } = useCustomer();
+  const { customer, lastCustomer } = useCustomer();
   // Sales reps and admins order ON BEHALF of a shop, so they must type that
   // shop's details into the cart. A customer already gave theirs at login.
   const isStaff = isSalesRep || isAdmin;
   const placedBy = isSalesRep ? "salesRep" : isAdmin ? "admin" : "customer";
-  const { submitOrder } = useOrders();
+  const { submitOrder, newOrderId, orders } = useOrders();
+  const [placing, setPlacing] = useState(false);
+  const placingRef = useRef(false); // synchronous guard against a double click
   const [notice, setNotice] = useState(null);
 
   // Cart lines use the unit price AND the pieces-per-unit captured when
@@ -65,9 +73,24 @@ export default function CartModal({ onClose }) {
   const [fields, setFields] = useState({ shopName: "", location: "", mobile: "" });
   const [fieldErrors, setFieldErrors] = useState({});
 
+  // Shops we already know (past orders + the last customer on this device).
+  // Picking/typing one fills in its location and mobile — but only into
+  // fields that are still empty, so nothing already typed is overwritten.
+  const knownCustomers = collectKnownCustomers(orders, lastCustomer ? [lastCustomer] : []);
+
   function setField(name, value) {
-    setFields((prev) => ({ ...prev, [name]: value }));
-    if (fieldErrors[name]) setFieldErrors((prev) => ({ ...prev, [name]: undefined }));
+    setFields((prev) => {
+      const next = { ...prev, [name]: value };
+      const match =
+        name === "shopName"
+          ? matchByShopName(knownCustomers, value)
+          : name === "mobile"
+          ? matchByMobile(knownCustomers, value)
+          : null;
+      return match ? autofillFields(next, match) : next;
+    });
+    // clear any error on the fields that were just edited or auto-filled
+    setFieldErrors({});
   }
 
   // Miscellaneous charges exist only for staff; a customer never sees or
@@ -99,7 +122,8 @@ export default function CartModal({ onClose }) {
   // Every order — customer, sales rep or admin — is a REQUEST: it is saved
   // as pending for an admin to approve (changing no stock at all) and the
   // same details are sent to the admin on WhatsApp so they know it's waiting.
-  function handlePlaceOrder() {
+  async function handlePlaceOrder() {
+    if (placingRef.current) return; // already sending this order
     const checked = isStaff
       ? validateDetails(fields)
       : customer
@@ -123,39 +147,69 @@ export default function CartModal({ onClose }) {
       caption: it.caption,
       pieces: Math.round(it.qty * multiplierOf(it)),
     }));
-    const result = submitOrder({
-      lines,
-      items,
-      extraAmount,
-      itemsTotal,
-      roundOff,
-      totalValue,
-      ...details,
-    });
-    if (!result.ok) {
-      setNotice({ type: "error", text: t("orderSubmitFailed") });
-      return;
+
+    placingRef.current = true;
+    setPlacing(true);
+    setNotice(null);
+
+    // Saving an order can take a network round-trip (Firebase), and browsers —
+    // iOS Safari especially — only allow a new tab to open straight from a tap.
+    // So the WhatsApp tab is opened NOW (blank) and pointed at the message once
+    // the order is safely saved. If saving fails, the blank tab is closed and
+    // nothing is sent.
+    let popup = null;
+    try {
+      popup = window.open("about:blank", "_blank");
+      if (popup) popup.opener = null;
+    } catch {
+      popup = null;
     }
 
-    // Open WhatsApp in the same click so the browser allows the pop-up.
-    window.open(
-      whatsappCartOrderLink(items, extraAmount, details, orderRefOf(result.id)),
-      "_blank",
-      "noopener,noreferrer"
-    );
+    try {
+      const id = newOrderId();
+      const result = await submitOrder({
+        id,
+        lines,
+        items,
+        extraAmount,
+        itemsTotal,
+        roundOff,
+        totalValue,
+        ...details,
+      });
+      if (!result.ok) {
+        if (popup) popup.close();
+        setNotice({ type: "error", text: t("orderSubmitFailed") });
+        return;
+      }
 
-    // Give back anything an OLD cart line had debited (new lines never
-    // debit), then empty the cart — the order now lives in the pending queue.
-    items.forEach(creditStockBack);
-    clearCart();
-    setFields({ shopName: "", location: "", mobile: "" });
-    setFieldErrors({});
-    setNotice({
-      type: "success",
-      ref: orderRefOf(result.id),
-      name: details.shopName,
-      staff: isStaff,
-    });
+      const url = whatsappCartOrderLink(
+        items,
+        extraAmount,
+        details,
+        orderRefOf(result.id),
+        t,
+        (it) => translateFolderName(lang, it.folderSlug, it.folderName)
+      );
+      if (popup) popup.location.href = url;
+      else window.open(url, "_blank", "noopener,noreferrer");
+
+      // Give back anything an OLD cart line had debited (new lines never
+      // debit), then empty the cart — the order now lives in the pending queue.
+      items.forEach(creditStockBack);
+      clearCart();
+      setFields({ shopName: "", location: "", mobile: "" });
+      setFieldErrors({});
+      setNotice({
+        type: "success",
+        ref: orderRefOf(result.id),
+        name: details.shopName,
+        staff: isStaff,
+      });
+    } finally {
+      placingRef.current = false;
+      setPlacing(false);
+    }
   }
 
   // Credits an item's debited stock back (used when it's removed from the
@@ -290,7 +344,7 @@ export default function CartModal({ onClose }) {
             <div className="cart-panel-footer">
               <div className="cart-summary">
                 {t.count("cartItemCount", items.length)} ·{" "}
-                {t("totalQtyLabel")}: {totalQty} ({totalPieces} pc)
+                {t("totalQtyLabel")}: {totalPieces} pc
               </div>
 
               {isStaff && (
@@ -298,6 +352,15 @@ export default function CartModal({ onClose }) {
                   <div className="cart-shop-details-title">
                     {t("customerDetailsTitle")}
                   </div>
+                  <datalist id="cart-known-shops">
+                    {knownCustomers.slice(0, 50).map((c) => (
+                      <option
+                        key={c.mobile || c.shopName}
+                        value={c.shopName}
+                        label={[c.location, c.mobile].filter(Boolean).join(" · ")}
+                      />
+                    ))}
+                  </datalist>
                   {[
                     ["shopName", "shopNameLabel", "shopNamePlaceholder", "text"],
                     ["location", "locationLabel", "locationPlaceholder", "text"],
@@ -309,6 +372,11 @@ export default function CartModal({ onClose }) {
                       </label>
                       <input
                         id={`cart-${name}`}
+                        name={name}
+                        autoComplete={
+                          name === "shopName" ? "organization" : name === "mobile" ? "tel-national" : "address-level2"
+                        }
+                        list={name === "shopName" ? "cart-known-shops" : undefined}
                         type={type}
                         inputMode={type === "tel" ? "tel" : undefined}
                         className={
@@ -395,6 +463,7 @@ export default function CartModal({ onClose }) {
                   type="button"
                   className="btn btn-solid cart-order-btn"
                   onClick={handlePlaceOrder}
+                  disabled={placing}
                 >
                   <WhatsAppIcon size={18} /> {t("placeOrderWhatsApp")}
                 </button>
