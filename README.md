@@ -199,4 +199,9 @@ Either:
   pass, but the native share sheet and safe-area insets are easiest to
   confirm on an actual Android or iOS device.
 
-Updated directly in GitHub Codespaces browser.
+
+## Firebase (optional)
+
+By default the app stores everything in the browser. To use Firebase Authentication + Cloud Firestore
+instead — shared data, real logins, server-enforced stock rules — follow **[docs/FIREBASE_SETUP.md](docs/FIREBASE_SETUP.md)**.
+Copy `.env.example` to `.env.local` and fill in your project's web config; leave it empty to stay in local mode.
