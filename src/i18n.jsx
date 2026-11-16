@@ -171,7 +171,7 @@ const STRINGS = {
     mockActiveNote:
       "Mock data is loaded: {products} products stocked, {orders} sample orders.",
     mockHelp:
-      "Try it: the first 8 photos of the first folder have stock 1000 / 400 / 150 / 75 / 74 / 30 / 1 / 0. Sign in as a sales rep (rep1@unitedjewelpack.com / Rep123$) to place orders. Orders → 5 pending (P2 fits only until P1 is approved; two are already short); Dispatch → 3 approved.",
+      "Try it: the first 8 photos of the first folder have stock 1000 / 400 / 150 / 75 / 74 / 30 / 1 / 0. Sign in as a sales rep to place orders (demo logins are in src/localCredentials.js). Orders → 5 pending (P2 fits only until P1 is approved; two are already short); Dispatch → 3 approved.",
     mockLoad: "Load mock data",
     mockReload: "Reload mock data",
     mockRemove: "Remove mock data",
@@ -239,6 +239,36 @@ const STRINGS = {
     dispatchConfirmRemoved: "{count} ordered product(s) removed — their reservation goes back to available.",
     orderRemovedLabel: "removed from dispatch",
     orderAddedLabel: "added to this dispatch",
+    // sign-in outcomes (Firebase)
+    signingIn: "Signing in…",
+    loginError_bad_credentials: "Incorrect email or password.",
+    loginError_not_authorised:
+      "This account isn't set up for this app. Ask the admin to add it.",
+    loginError_wrong_role: "This account belongs to a different role — use the other sign-in.",
+    loginError_too_many: "Too many attempts. Please wait a few minutes and try again.",
+    loginError_network: "Can't reach the server. Check your internet connection and try again.",
+    loginError_disabled: "This account has been disabled. Contact the admin.",
+    loginError_unavailable: "Sign-in isn't available right now. Please try again shortly.",
+    // Firebase panel (admin)
+    fbTitle: "Firebase",
+    fbConnected: "Connected to Firebase project: {project}. Stock, prices and orders are stored there.",
+    fbLocalFound:
+      "This browser still holds {products} products with stock/prices and {orders} orders from before Firebase. Copy them to Firebase once (the local copy is kept as a backup).",
+    fbSkippedMock: "{n} sample order(s) from the Test-data tool will not be copied.",
+    fbCopyBtn: "Copy to Firebase",
+    fbCopying: "Copying…",
+    fbCopyConfirm:
+      "Copy {products} products and {orders} orders from this browser to Firebase? Nothing is deleted here, and this can only be done once.",
+    fbCopied: "Done — copied {inventory} products and {orders} orders to Firebase.",
+    fbMigratedNote: "Your earlier data was copied to Firebase. The original stays in this browser as a backup.",
+    fbErr_inconsistent: "The local data is inconsistent (approved orders reserve more stock than exists), so it can't be copied until that is fixed.",
+    fbErr_remote_not_empty: "Firebase already contains inventory or orders, so nothing was copied (to avoid overwriting them).",
+    fbErr_already_done: "The data was already copied to Firebase.",
+    fbErr_nothing_to_copy: "There is nothing to copy.",
+    fbErr_error: "The copy failed. Nothing was deleted — you can try again.",
+    fbErr_permission: "Firebase refused that change. Make sure you are signed in as an admin.",
+    fbErr_write: "The change couldn't be saved to Firebase. Check your connection and try again.",
+    fbDismiss: "Dismiss",
     // one signed-in user at a time
     role_admin: "Admin",
     role_salesRep: "Sales Rep",
