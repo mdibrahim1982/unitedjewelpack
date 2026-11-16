@@ -6,15 +6,21 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "node tests/inventoryLedger.test.mjs && node tests/mockData.test.mjs && node tests/customerDetails.test.mjs && node tests/activeSession.test.mjs && node tests/money.test.mjs",
-    "preview": "vite preview"
+    "hash-images": "node scripts/hash-base-images.mjs",
+    "test:e2e": "node tests/e2e/run.cjs",
+    "test": "node tests/inventoryLedger.test.mjs && node tests/mockData.test.mjs && node tests/customerDetails.test.mjs && node tests/activeSession.test.mjs && node tests/money.test.mjs && node tests/whatsappKeys.test.mjs && node tests/knownCustomers.test.mjs && node tests/duplicates.test.mjs && node tests/ordersRemote.test.mjs && node tests/session.test.mjs && node tests/migration.test.mjs",
+    "preview": "vite preview",
+    "test:rules": "npx -y firebase-tools@13 emulators:exec --only firestore --project unitedjewelpack-rules-test \"node tests/firestore.rules.test.mjs\"",
+    "test:e2e:firebase": "node tests/e2e/firebase.cjs"
   },
   "dependencies": {
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "firebase": "^11.0.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
-    "vite": "^5.1.0"
+    "vite": "^5.1.0",
+    "@firebase/rules-unit-testing": "^4.0.0"
   }
 }
