@@ -18,6 +18,7 @@ import { SalesRepAuthProvider, useSalesRepAuth } from "./salesRepAuth";
 import { PhotoStoreProvider, usePhotoStore } from "./photoStore";
 import { CartProvider } from "./cartStore";
 import { OrdersProvider } from "./ordersStore";
+import { RemoteInventoryProvider } from "./firebase/RemoteInventory";
 import { CustomerProvider, useCustomer } from "./customerStore";
 import { PricingProvider } from "./pricingStore";
 
@@ -151,6 +152,7 @@ export default function App() {
       <AuthProvider>
         <SalesRepAuthProvider>
          <CustomerProvider>
+          <RemoteInventoryProvider>
           <PhotoStoreProvider>
             <OrdersProvider>
               <CartProvider>
@@ -160,6 +162,7 @@ export default function App() {
               </CartProvider>
             </OrdersProvider>
           </PhotoStoreProvider>
+          </RemoteInventoryProvider>
          </CustomerProvider>
         </SalesRepAuthProvider>
       </AuthProvider>

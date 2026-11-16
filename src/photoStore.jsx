@@ -1,5 +1,9 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { ALL_FOLDERS as BASE_FOLDERS } from "./data";
+import { USE_REMOTE } from "./backend";
+import { getBackend } from "./firebase/backendFactory";
+import { useRemoteInventory } from "./firebase/RemoteInventory";
+import { setPhysical, setPrice, seedIfMissing } from "./firebase/ordersRemote";
 
 // Local copy (not imported from pricingStore, which depends on this file).
 function parseStock(value) {
@@ -125,13 +129,42 @@ export function PhotoStoreProvider({ children }) {
   // photo is tagged with its folderId at read time. This is what lets
   // reservations and orders refer to one unambiguous product. The tag is
   // in-memory only — it is never written into the saved patches.
+  const { inventory: remoteInventory } = useRemoteInventory();
+  const [remoteError, setRemoteError] = useState(null);
+
   const folders = BASE_FOLDERS.map((f) => {
     const merged = applyPatch(f, patches[f.id]);
     return {
       ...merged,
-      photos: merged.photos.map((p) => ({ ...p, folderId: f.id })),
+      photos: merged.photos.map((p) => {
+        if (!USE_REMOTE) return { ...p, folderId: f.id };
+        // Firebase mode: Firestore is the source of truth for stock and price.
+        // Values left in this browser's old local data are ignored here (and
+        // never deleted — the admin "Copy to Firebase" tool migrates them).
+        const doc = remoteInventory[`${f.id}:${p.id}`];
+        return {
+          ...p,
+          folderId: f.id,
+          stock: doc ? doc.physical : null,
+          price: doc && Number.isFinite(doc.price) ? doc.price : null,
+        };
+      }),
     };
   });
+
+  // Runs a Firestore write and surfaces a failure (permission denied, offline,
+  // "below reserved"…) instead of silently losing it.
+  async function remoteCall(fn) {
+    try {
+      const { store } = await getBackend();
+      const r = await fn(store);
+      setRemoteError(r && r.ok === false ? { code: r.code, reserved: r.reserved } : null);
+      return r;
+    } catch (e) {
+      setRemoteError({ code: (e && e.code) || "error" });
+      return { ok: false, code: "error" };
+    }
+  }
 
   function getFolder(slug) {
     return folders.find((f) => f.slug === slug) || null;
@@ -187,6 +220,12 @@ export function PhotoStoreProvider({ children }) {
 
   // `price` is a number (₹ per pc) or null to fall back to the default rate.
   function updatePrice(folderId, photoId, price) {
+    if (USE_REMOTE) {
+      remoteCall((store) =>
+        setPrice(store, `${folderId}:${photoId}`, Number.isFinite(price) ? price : null)
+      );
+      return;
+    }
     updatePatch(folderId, (patch) => {
       const addedIndex = patch.added.findIndex((p) => p.id === photoId);
       if (addedIndex !== -1) {
@@ -206,6 +245,11 @@ export function PhotoStoreProvider({ children }) {
   // `stock` is the number of pieces (pc) an admin has on hand for a photo,
   // or null to clear it (no inventory limit for that item).
   function updateStock(folderId, photoId, stock) {
+    if (USE_REMOTE) {
+      const n = parseStock(stock);
+      remoteCall((store) => setPhysical(store, `${folderId}:${photoId}`, n ?? 0));
+      return;
+    }
     updatePatch(folderId, (patch) => {
       const addedIndex = patch.added.findIndex((p) => p.id === photoId);
       if (addedIndex !== -1) {
@@ -226,6 +270,9 @@ export function PhotoStoreProvider({ children }) {
   // dispatch touching many products either lands completely or not at all.
   // Never lets a product go below 0. deltas: [{ folderId, photoId, delta }]
   function adjustStockBatch(deltas) {
+    // Firebase mode: stock only ever changes inside a Firestore transaction
+    // (confirm dispatch / manual edit), never through this local helper.
+    if (USE_REMOTE) return;
     setPatches((prev) => {
       const next = { ...prev };
       for (const { folderId, photoId, delta } of deltas) {
@@ -355,14 +402,27 @@ export function PhotoStoreProvider({ children }) {
     });
 
     byTarget.forEach((photos, targetFolderId) => {
+      const stamp = Date.now();
+      const ids = photos.map(
+        (_, i) => `restored-${stamp}-${i}-${Math.random().toString(36).slice(2, 7)}`
+      );
+      // A restored product gets a NEW id, so in Firebase mode its inventory
+      // document is created from the stock/price it had when it was backed up
+      // (never overwriting an existing one).
+      if (USE_REMOTE) {
+        const seeds = photos.map((photo, i) => ({
+          key: `${targetFolderId}:${ids[i]}`,
+          physical: photo.stock ?? 0,
+          price: photo.price ?? null,
+        }));
+        remoteCall((store) => seedIfMissing(store, seeds));
+      }
       updatePatch(targetFolderId, (patch) => ({
         ...patch,
         added: [
           ...patch.added,
           ...photos.map((photo, i) => ({
-            id: `restored-${Date.now()}-${i}-${Math.random()
-              .toString(36)
-              .slice(2, 7)}`,
+            id: ids[i],
             img: photo.img,
             caption: photo.caption,
             price: photo.price ?? null,
@@ -404,6 +464,8 @@ export function PhotoStoreProvider({ children }) {
         permanentlyDeleteBackupPhoto,
         permanentlyDeleteBackupPhotos,
         resetFolder,
+        remoteError,
+        clearRemoteError: () => setRemoteError(null),
       }}
     >
       {children}
