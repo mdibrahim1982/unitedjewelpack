@@ -3,6 +3,8 @@ import { useLanguage, translateFolderName } from "../i18n";
 import { usePhotoStore } from "../photoStore";
 import { usePricing, formatMoney, parsePrice } from "../pricingStore";
 import AdminInventory from "./AdminInventory";
+import FirebasePanel from "./FirebasePanel";
+import { USE_REMOTE } from "../backend";
 import { hashBytes, bytesFromDataUrl } from "../imageHash";
 import { BASE_IMAGE_HASHES } from "../baseImageHashes";
 import { buildDuplicateIndex, addToIndex, checkUpload, fileStem } from "../duplicates";
@@ -412,41 +414,45 @@ export default function AdminDashboard({ onGoToSite }) {
       <p className="page-sub">{t("adminDashboardSubtitle")}</p>
       <p className="admin-note">{t("changesSavedNote")}</p>
 
+      {USE_REMOTE ? (
+        <FirebasePanel />
+      ) : (
       <div className="mock-data-bar">
-        <div className="mock-data-text">
-          <strong>{t("mockTitle")}</strong>
-          <span>
-            {mockInfo
-              ? t("mockActiveNote", {
-                  products: mockInfo.summary?.products ?? 0,
-                  orders: mockInfo.summary?.orders ?? 0,
-                })
-              : t("mockInactiveNote")}
-          </span>
-          <span className="mock-data-help">{t("mockHelp")}</span>
-        </div>
-        <div className="mock-data-actions">
-          <button className="btn btn-solid btn-sm" onClick={handleLoadMock}>
-            {mockInfo ? t("mockReload") : t("mockLoad")}
-          </button>
-          {mockInfo && (
-            <button className="btn btn-ghost btn-sm" onClick={handleRemoveMock}>
-              {t("mockRemove")}
+          <div className="mock-data-text">
+            <strong>{t("mockTitle")}</strong>
+            <span>
+              {mockInfo
+                ? t("mockActiveNote", {
+                    products: mockInfo.summary?.products ?? 0,
+                    orders: mockInfo.summary?.orders ?? 0,
+                  })
+                : t("mockInactiveNote")}
+            </span>
+            <span className="mock-data-help">{t("mockHelp")}</span>
+          </div>
+          <div className="mock-data-actions">
+            <button className="btn btn-solid btn-sm" onClick={handleLoadMock}>
+              {mockInfo ? t("mockReload") : t("mockLoad")}
             </button>
+            {mockInfo && (
+              <button className="btn btn-ghost btn-sm" onClick={handleRemoveMock}>
+                {t("mockRemove")}
+              </button>
+            )}
+          </div>
+          {mockFlash && (
+            <p
+              className={
+                "cart-notice mock-data-flash" +
+                (mockFlash.type === "error" ? " cart-notice-error" : "")
+              }
+              role="status"
+            >
+              {mockFlash.text}
+            </p>
           )}
         </div>
-        {mockFlash && (
-          <p
-            className={
-              "cart-notice mock-data-flash" +
-              (mockFlash.type === "error" ? " cart-notice-error" : "")
-            }
-            role="status"
-          >
-            {mockFlash.text}
-          </p>
-        )}
-      </div>
+      )}
 
       <div className="admin-view-tabs">
         <button

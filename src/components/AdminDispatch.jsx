@@ -119,7 +119,7 @@ export default function AdminDispatch() {
     );
   }
 
-  function handleConfirm(order) {
+  async function handleConfirm(order) {
     if (inFlight.current) return;
     const r = readOrder(order);
     if (Object.keys(r.errors).length || r.total === 0) return;
@@ -140,7 +140,7 @@ export default function AdminDispatch() {
 
     inFlight.current = true;
     try {
-      const result = confirmDispatch(
+      const result = await confirmDispatch(
         order.id,
         r.dispatched,
         extrasOf(order).map(({ key, folderId, photoId, caption }) => ({
@@ -166,12 +166,12 @@ export default function AdminDispatch() {
     }
   }
 
-  function handleCancel(order) {
+  async function handleCancel(order) {
     if (inFlight.current) return;
     if (!window.confirm(t("cancelApprovedConfirm"))) return;
     inFlight.current = true;
     try {
-      const result = cancelOrder(order.id);
+      const result = await cancelOrder(order.id);
       setMessage(
         result.ok
           ? { type: "ok", text: t("orderCancelledReleased") }

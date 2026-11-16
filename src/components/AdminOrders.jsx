@@ -26,11 +26,14 @@ export default function AdminOrders() {
     return key;
   };
 
-  function run(id, action, okKey) {
-    if (busyId) return; // ignore clicks while an action is in flight
+  // Order actions are asynchronous (a Firestore transaction in Firebase mode).
+  // `busyId` is set synchronously before the first await, so a double click
+  // can't start the same action twice from this screen.
+  async function run(id, action, okKey) {
+    if (busyId) return;
     setBusyId(id);
     try {
-      const result = action(id);
+      const result = await action(id);
       setMessage(
         result.ok
           ? { type: "ok", text: t(okKey) }
