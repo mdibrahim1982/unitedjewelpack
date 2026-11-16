@@ -1,0 +1,12 @@
+node_modules
+dist
+
+
+# Firebase / environment (never commit real values)
+.env
+.env.local
+.env.*.local
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
