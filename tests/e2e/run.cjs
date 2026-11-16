@@ -7,20 +7,8 @@
 // installs it). When they aren't in node_modules it also looks in the global
 // install folder; set E2E_NODE_PATH to point somewhere else.
 const path = require("node:path");
-const http = require("node:http");
 const fs = require("node:fs");
-const os = require("node:os");
-
-const ROOT = path.resolve(__dirname, "../..");
-const GLOBAL = process.env.E2E_NODE_PATH || "/home/claude/.npm-global/lib/node_modules";
-function load(name, extra = []) {
-  for (const base of [null, GLOBAL, ...extra]) {
-    try { return require(base ? path.join(base, name) : name); } catch { /* try next */ }
-  }
-  throw new Error(`Cannot find "${name}". Install it (npm i -D ${name}) or set E2E_NODE_PATH.`);
-}
-const { chromium } = load("playwright");
-const esbuild = load("esbuild", [path.join(GLOBAL, "tsx/node_modules")]);
+const { startApp, OPEN_STUB } = require("./harness.cjs");
 
 let failures = 0;
 let passes = 0;
@@ -30,44 +18,22 @@ const check = (name, ok, extra = "") => {
 };
 
 (async () => {
-  // ---- build + serve ----
-  const out = fs.mkdtempSync(path.join(os.tmpdir(), "ujp-e2e-"));
-  await esbuild.build({
-    entryPoints: [path.join(ROOT, "src/main.jsx")],
-    bundle: true, jsx: "automatic", outfile: path.join(out, "bundle.js"),
-    loader: { ".jsx": "jsx", ".jpg": "dataurl", ".jpeg": "dataurl", ".png": "dataurl" },
-    define: { "process.env.NODE_ENV": '"development"' }, logLevel: "warning",
-    nodePaths: [GLOBAL],
-  });
-  fs.writeFileSync(path.join(out, "index.html"),
-    '<!DOCTYPE html><html><head><meta charset="UTF-8"><link rel="stylesheet" href="bundle.css"></head><body><div id="root"></div><script src="bundle.js"></script></body></html>');
-  const server = http.createServer((req, res) => {
-    const url = decodeURIComponent(req.url.split("?")[0]);
-    const file = url.startsWith("/assets/") ? path.join(ROOT, "public", url) : path.join(out, url === "/" ? "index.html" : url);
-    fs.readFile(file, (err, data) => {
-      if (err) { res.writeHead(404); res.end(); return; }
-      const ext = path.extname(file);
-      res.writeHead(200, { "Content-Type": { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".jpg": "image/jpeg", ".jpeg": "image/jpeg" }[ext] || "application/octet-stream" });
-      res.end(data);
-    });
-  });
-  await new Promise((r) => server.listen(0, r));
-  const BASE = `http://localhost:${server.address().port}/index.html`;
-
-  const browser = await chromium.launch();
+  const app = await startApp({ backend: "local" });
+  const { ROOT, BASE, browser } = app;
   const ctx = await browser.newContext({ viewport: { width: 1300, height: 1000 } });
   const page = await ctx.newPage();
   const errs = [];
   page.on("pageerror", (e) => errs.push(e.message));
   let dialogs = []; let dialogAnswer = true;
   page.on("dialog", (d) => { dialogs.push(d.message()); (dialogAnswer ? d.accept() : d.dismiss()).catch(() => {}); });
-  await page.addInitScript(() => { window.__opened = []; window.open = (u) => { window.__opened.push(u); return null; }; });
+  await page.addInitScript(OPEN_STUB);
 
   const ls = (k) => page.evaluate((k) => JSON.parse(localStorage.getItem(k) || "null"), k);
   const patches = async () => (await ls("ujp_photo_patches")) || {};
   const physical = async (f, id) => (await patches())?.[f]?.stock?.[String(id)];
   const orders = async () => (await ls("ujp_orders")) || [];
-  const lastMsg = async () => { const u = await page.evaluate(() => window.__opened.slice(-1)[0]); return u ? decodeURIComponent(new URL(u).searchParams.get("text") || "") : null; };
+  const waLinks = () => page.evaluate(() => window.__opened.filter((u) => /^https:\/\/wa\.me\//.test(u)));
+  const lastMsg = async () => { const u = (await waLinks()).slice(-1)[0]; return u ? decodeURIComponent(new URL(u).searchParams.get("text") || "") : null; };
   const CUST = { shopName: "Test Gold House", location: "Tirunelveli", mobile: "9876543210" };
 
   async function reset(stock = { "1": 1000, "2": 400, "3": 200 }, extra = {}) {
@@ -333,7 +299,7 @@ const check = (name, ok, extra = "") => {
   check("stock unchanged and the reason is shown", (await physical("ring-boxes", 1)) === 1000 && /reserved for approved orders/.test(await row.innerText()));
 
   check("no runtime errors in the browser", errs.length === 0, errs.slice(0, 2).join(" | "));
-  await browser.close(); server.close();
+  await app.close();
   console.log(failures ? `\n${failures} CHECK(S) FAILED (${passes} passed)\n` : `\nALL ${passes} CHECKS PASSED\n`);
   process.exit(failures ? 1 : 0);
 })().catch((e) => { console.error("E2E crashed:", e); process.exit(2); });
