@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useLanguage, translateFolderName } from "../i18n";
 import { useCart } from "../cartStore";
 import { usePhotoStore } from "../photoStore";
@@ -30,7 +30,9 @@ export default function CartModal({ onClose }) {
   // shop's details into the cart. A customer already gave theirs at login.
   const isStaff = isSalesRep || isAdmin;
   const placedBy = isSalesRep ? "salesRep" : isAdmin ? "admin" : "customer";
-  const { submitOrder, orders } = useOrders();
+  const { submitOrder, newOrderId, orders } = useOrders();
+  const [placing, setPlacing] = useState(false);
+  const placingRef = useRef(false); // synchronous guard against a double click
   const [notice, setNotice] = useState(null);
 
   // Cart lines use the unit price AND the pieces-per-unit captured when
@@ -120,7 +122,8 @@ export default function CartModal({ onClose }) {
   // Every order — customer, sales rep or admin — is a REQUEST: it is saved
   // as pending for an admin to approve (changing no stock at all) and the
   // same details are sent to the admin on WhatsApp so they know it's waiting.
-  function handlePlaceOrder() {
+  async function handlePlaceOrder() {
+    if (placingRef.current) return; // already sending this order
     const checked = isStaff
       ? validateDetails(fields)
       : customer
@@ -144,46 +147,69 @@ export default function CartModal({ onClose }) {
       caption: it.caption,
       pieces: Math.round(it.qty * multiplierOf(it)),
     }));
-    const result = submitOrder({
-      lines,
-      items,
-      extraAmount,
-      itemsTotal,
-      roundOff,
-      totalValue,
-      ...details,
-    });
-    if (!result.ok) {
-      setNotice({ type: "error", text: t("orderSubmitFailed") });
-      return;
+
+    placingRef.current = true;
+    setPlacing(true);
+    setNotice(null);
+
+    // Saving an order can take a network round-trip (Firebase), and browsers —
+    // iOS Safari especially — only allow a new tab to open straight from a tap.
+    // So the WhatsApp tab is opened NOW (blank) and pointed at the message once
+    // the order is safely saved. If saving fails, the blank tab is closed and
+    // nothing is sent.
+    let popup = null;
+    try {
+      popup = window.open("about:blank", "_blank");
+      if (popup) popup.opener = null;
+    } catch {
+      popup = null;
     }
 
-    // Open WhatsApp in the same click so the browser allows the pop-up.
-    window.open(
-      whatsappCartOrderLink(
+    try {
+      const id = newOrderId();
+      const result = await submitOrder({
+        id,
+        lines,
+        items,
+        extraAmount,
+        itemsTotal,
+        roundOff,
+        totalValue,
+        ...details,
+      });
+      if (!result.ok) {
+        if (popup) popup.close();
+        setNotice({ type: "error", text: t("orderSubmitFailed") });
+        return;
+      }
+
+      const url = whatsappCartOrderLink(
         items,
         extraAmount,
         details,
         orderRefOf(result.id),
         t,
         (it) => translateFolderName(lang, it.folderSlug, it.folderName)
-      ),
-      "_blank",
-      "noopener,noreferrer"
-    );
+      );
+      if (popup) popup.location.href = url;
+      else window.open(url, "_blank", "noopener,noreferrer");
 
-    // Give back anything an OLD cart line had debited (new lines never
-    // debit), then empty the cart — the order now lives in the pending queue.
-    items.forEach(creditStockBack);
-    clearCart();
-    setFields({ shopName: "", location: "", mobile: "" });
-    setFieldErrors({});
-    setNotice({
-      type: "success",
-      ref: orderRefOf(result.id),
-      name: details.shopName,
-      staff: isStaff,
-    });
+      // Give back anything an OLD cart line had debited (new lines never
+      // debit), then empty the cart — the order now lives in the pending queue.
+      items.forEach(creditStockBack);
+      clearCart();
+      setFields({ shopName: "", location: "", mobile: "" });
+      setFieldErrors({});
+      setNotice({
+        type: "success",
+        ref: orderRefOf(result.id),
+        name: details.shopName,
+        staff: isStaff,
+      });
+    } finally {
+      placingRef.current = false;
+      setPlacing(false);
+    }
   }
 
   // Credits an item's debited stock back (used when it's removed from the
@@ -437,6 +463,7 @@ export default function CartModal({ onClose }) {
                   type="button"
                   className="btn btn-solid cart-order-btn"
                   onClick={handlePlaceOrder}
+                  disabled={placing}
                 >
                   <WhatsAppIcon size={18} /> {t("placeOrderWhatsApp")}
                 </button>
